@@ -24,6 +24,7 @@ function openModal(nextMode) {
   title.textContent = config[0];
   copy.textContent = config[1];
   el("account-submit").textContent = config[2];
+  setVisible("resend-confirmation", mode === "login");
   setVisible("name-field", mode === "join");
   setVisible("role-field", mode === "join");
   setVisible("email-field", mode !== "post");
@@ -45,6 +46,26 @@ document.querySelectorAll("[data-open]").forEach(button => {
   button.addEventListener("click", () => openModal(button.dataset.open));
 });
 el("close").addEventListener("click", () => modal.close());
+
+el("resend-confirmation").addEventListener("click", async () => {
+  const email = el("account-email").value.trim();
+  if (!email) { say("আগে আপনার নিবন্ধিত Gmail ঠিকানাটি লিখুন।"); return; }
+  const button = el("resend-confirmation");
+  button.disabled = true;
+  try {
+    const { error } = await db.auth.resend({
+      type: "signup",
+      email,
+      options: { emailRedirectTo: "https://almuntasir0011-alt.github.io/EnziLink/" }
+    });
+    if (error) throw error;
+    say("নিশ্চিতকরণ ইমেইল পাঠানোর অনুরোধ করা হয়েছে। Gmail-এর Inbox ও Spam ফোল্ডার দেখুন।");
+  } catch (error) {
+    say(error.message || "ইমেইল পাঠানো যায়নি।");
+  } finally {
+    button.disabled = false;
+  }
+});
 
 async function ensureWorkerRole() {
   const { data: { user }, error: userError } = await db.auth.getUser();
