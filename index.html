@@ -12,10 +12,10 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>EnziLink — Connect Skills. Create Opportunities.</title>
-<link rel="stylesheet" href="styles.css?v=worker-directory-2">
+<link rel="stylesheet" href="styles.css?v=worker-profile-edit-3">
 </head>
 <body>
-<header><a class="brand" href="#"><b>E</b> Enzi<span>Link</span></a><nav><a href="#find">কর্মী খুঁজুন</a><a href="#how">কীভাবে কাজ করে</a><a href="#categories">পেশাসমূহ</a><a href="#ecosystem">EnziVolt</a></nav><div class="header-actions"><button id="install-app" class="ghost install-button" hidden>অ্যাপ ইনস্টল</button><button id="profile-open" class="ghost" type="button">আমার প্রোফাইল</button><button data-open="login" class="ghost">লগইন</button><button data-open="join">যুক্ত হোন</button></div></header>
+<header><a class="brand" href="#"><b>E</b> Enzi<span>Link</span></a><nav><a href="#find">কর্মী খুঁজুন</a><a href="#how">কীভাবে কাজ করে</a><a href="#categories">পেশাসমূহ</a><a href="#ecosystem">EnziVolt</a></nav><div class="header-actions"><button id="install-app" class="ghost install-button" hidden>অ্যাপ ইনস্টল</button><button id="profile-open" class="ghost" type="button">প্রোফাইল সম্পাদনা</button><button data-open="login" class="ghost">লগইন</button><button data-open="join">যুক্ত হোন</button></div></header>
 <main>
 <section class="hero"><div><small>● বাংলাদেশের দক্ষ কর্মীদের নেটওয়ার্ক</small><h1>দক্ষ মানুষ খুঁজুন।<br><em>কাজের সুযোগ তৈরি করুন।</em></h1><p>আপনার প্রয়োজনীয় কর্মী খুঁজুন অথবা নিজের দক্ষতা দিয়ে নতুন কাজের সুযোগ তৈরি করুন। গ্রাহক ও কর্মীর সরাসরি সংযোগ—একটি প্ল্যাটফর্মে।</p><a class="primary" href="#find">কর্মী খুঁজুন ↗</a> <button class="outline" data-open="post">কাজ পোস্ট করুন</button><p class="proof">✓ বিনামূল্যে প্রোফাইল　 ✓ সরাসরি যোগাযোগ　 ✓ বিভিন্ন পেশা</p></div><div class="visual"><div class="orbit"></div><div class="hub"><b>E</b><strong>EnziLink</strong><small>CONNECTING PEOPLE</small></div><aside class="tag t1">✦ দক্ষতার সংযোগ</aside><aside class="tag t2">🔧 ইলেকট্রিশিয়ান · ঢাকা</aside><aside class="tag t3">🛠 প্লাম্বার · চট্টগ্রাম</aside><aside class="tag t4">✓ সরাসরি যোগাযোগ</aside></div></section>
 <section class="search" id="find"><small>আপনার প্রয়োজন শুরু হোক এখানে</small><h2>কাকে খুঁজছেন?</h2><form id="search-form"><label>পেশা বা দক্ষতা<input id="profession" placeholder="যেমন: Electrician, Plumber..."></label><label>এলাকা<select id="area"><option value="">সব এলাকা</option><option>ঢাকা</option><option>চট্টগ্রাম</option><option>দিনাজপুর</option><option>রাজশাহী</option><option>খুলনা</option><option>সিলেট</option></select></label><button class="primary">খুঁজুন ⌕</button></form><p id="status" aria-live="polite"></p><div id="worker-results" class="worker-results" aria-live="polite"></div></section>
@@ -40,7 +40,7 @@
 <button id="account-submit" class="primary">চালিয়ে যান</button>
 <button id="resend-confirmation" class="outline" type="button" hidden>নিশ্চিতকরণ ইমেইল আবার পাঠান</button>
 </form><p id="message" aria-live="polite"></p></dialog>
-<dialog id="profile-dialog"><button id="profile-close" class="close" type="button">×</button><small>কর্মী অ্যাকাউন্ট</small><h2>কর্মী প্রোফাইল তৈরি</h2><p>প্রোফাইল প্রকাশ করলে আপনার ফোন নম্বরও গ্রাহকদের কাছে দৃশ্যমান হবে। ব্যক্তিগত নম্বরের বদলে কাজের জন্য নির্ধারিত নম্বর ব্যবহার করুন।</p>
+<dialog id="profile-dialog"><button id="profile-close" class="close" type="button">×</button><small>কর্মী অ্যাকাউন্ট</small><h2>প্রোফাইল তৈরি / সম্পাদনা</h2><p>আগে তৈরি করা প্রোফাইলের তথ্য এখানে পরিবর্তন করে সংরক্ষণ করুন। ফোন নম্বর প্রকাশিত প্রোফাইলে গ্রাহকরা দেখতে পারবেন। ব্যক্তিগত নম্বরের বদলে কাজের জন্য নির্ধারিত নম্বর ব্যবহার করুন।</p>
 <form id="worker-profile-form">
 <label>আপনার নাম<input id="profile-name" maxlength="100" required></label>
 <label>কাজের এলাকা<input id="profile-area" maxlength="120" placeholder="যেমন: ঢাকা, দিনাজপুর" required></label>
@@ -50,11 +50,10 @@
 <label>দক্ষতা (কমা দিয়ে আলাদা করুন)<input id="profile-skills" maxlength="1000" placeholder="Wiring, CCTV, DB installation" required></label>
 <label>নিজের পরিচিতি<textarea id="profile-bio" maxlength="1500" rows="4" placeholder="আপনার কাজের অভিজ্ঞতা ও দক্ষতা লিখুন"></textarea></label>
 <label style="display:flex;align-items:center;gap:9px"><input id="profile-publish" type="checkbox" style="width:auto"> প্রোফাইলটি কর্মী খোঁজার তালিকায় প্রকাশ করুন</label>
-<button id="profile-save" class="primary">প্রোফাইল সংরক্ষণ করুন</button>
+<button id="profile-save" class="primary">পরিবর্তন সংরক্ষণ করুন</button>
 </form><p id="profile-message" aria-live="polite"></p></dialog>
 <dialog id="contact-dialog"><button id="contact-close" class="close" type="button">×</button><small>EnziLink নিরাপদ যোগাযোগ</small><h2 id="contact-title">কর্মীর সঙ্গে যোগাযোগ</h2><p id="contact-copy">নিজের প্রয়োজন সংক্ষেপে লিখে পাঠান।</p><form id="contact-form"><label>আপনার বার্তা<textarea id="contact-body" rows="4" maxlength="4000" required placeholder="কী ধরনের কাজ প্রয়োজন তা লিখুন"></textarea></label><button id="contact-send" class="primary">বার্তা পাঠান</button></form><p id="contact-message" aria-live="polite"></p></dialog>
 <script>
-/* Keep the profile dialog responsive even if the Supabase CDN is unavailable. */
 (() => {
   const open = document.getElementById("profile-open");
   const dialog = document.getElementById("profile-dialog");
@@ -67,7 +66,6 @@
   if (close && dialog) close.addEventListener("click", () => dialog.close());
 })();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
-  onerror="this.onerror=null;this.src='https://unpkg.com/@supabase/supabase-js@2';"></script>
-<script src="app.js?v=worker-directory-2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="this.onerror=null;this.src='https://unpkg.com/@supabase/supabase-js@2';"></script>
+<script src="app.js?v=worker-profile-edit-3"></script>
 </body></html>
