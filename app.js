@@ -233,3 +233,86 @@ window.addEventListener("load", () => {
   }
   showSession().catch(error => { status.textContent = error.message; });
 });
+
+
+// Worker profile setup: uses the existing authenticated EnziLink account.
+const profileDialog = el("profile-dialog");
+const profileMessage = el("profile-message");
+el("profile-open").addEventListener("click", async () => {
+  const { data: { user }, error } = await db.auth.getUser();
+  if (error || !user) {
+    profileMessage.textContent = "প্রোফাইল তৈরি করতে আগে লগইন করুন।";
+    openModal("login");
+    return;
+  }
+  profileMessage.textContent = "প্রোফাইলের তথ্য লোড হচ্ছে…";
+  profileDialog.showModal();
+  try {
+    const { data: profile, error: pError } = await db.from("el_profiles")
+      .select("display_name,role,area").eq("id", user.id).single();
+    if (pError) throw pError;
+    if (profile.role === "customer") {
+      const { error: roleError } = await db.rpc("el_become_worker");
+      if (roleError) throw roleError;
+    } else if (profile.role !== "worker") {
+      throw new Error("এই অ্যাকাউন্টে কর্মী প্রোফাইল তৈরি করা যাবে না।");
+    }
+    const { data: worker, error: wError } = await db.from("el_worker_profiles")
+      .select("headline,bio,years_experience,is_published").eq("user_id", user.id).maybeSingle();
+    if (wError) throw wError;
+    const { data: skills, error: sError } = await db.from("el_worker_skills")
+      .select("profession,skill").eq("worker_id", user.id);
+    if (sError) throw sError;
+    el("profile-name").value = profile.display_name || user.user_metadata?.display_name || "";
+    el("profile-area").value = profile.area || "";
+    el("profile-headline").value = worker?.headline || "";
+    el("profile-experience").value = worker?.years_experience ?? "";
+    el("profile-skills").value = (skills || []).map(x => x.skill ? x.profession + ": " + x.skill : x.profession).join(", ");
+    el("profile-bio").value = worker?.bio || "";
+    el("profile-publish").checked = worker?.is_published || false;
+    profileMessage.textContent = "তথ্য পূরণ করে সংরক্ষণ করুন।";
+  } catch (error) {
+    profileMessage.textContent = error.message || "প্রোফাইল লোড করা যায়নি।";
+  }
+});
+el("profile-close").addEventListener("click", () => profileDialog.close());
+el("worker-profile-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const button = el("profile-save");
+  button.disabled = true;
+  profileMessage.textContent = "সংরক্ষণ হচ্ছে…";
+  try {
+    const { data: { user }, error: authError } = await db.auth.getUser();
+    if (authError || !user) throw new Error("সেশন শেষ হয়েছে। আবার লগইন করুন।");
+    const name = el("profile-name").value.trim();
+    const area = el("profile-area").value.trim();
+    const headline = el("profile-headline").value.trim();
+    const experience = Number(el("profile-experience").value);
+    const bio = el("profile-bio").value.trim();
+    const published = el("profile-publish").checked;
+    const skillItems = el("profile-skills").value.split(",").map(s => s.trim()).filter(Boolean);
+    if (!skillItems.length) throw new Error("অন্তত একটি দক্ষতা লিখুন।");
+    const { error: pError } = await db.from("el_profiles")
+      .update({ display_name: name, area, updated_at: new Date().toISOString() }).eq("id", user.id);
+    if (pError) throw pError;
+    const { error: wError } = await db.from("el_worker_profiles").upsert({
+      user_id: user.id, headline, bio, years_experience: experience,
+      is_published: published, updated_at: new Date().toISOString()
+    }, { onConflict: "user_id" });
+    if (wError) throw wError;
+    const { error: dError } = await db.from("el_worker_skills").delete().eq("worker_id", user.id);
+    if (dError) throw dError;
+    const { error: sError } = await db.from("el_worker_skills").insert(
+      skillItems.map(item => ({ worker_id: user.id, profession: headline, skill: item }))
+    );
+    if (sError) throw sError;
+    profileMessage.textContent = published
+      ? "প্রোফাইল সংরক্ষিত এবং প্রকাশিত হয়েছে।"
+      : "প্রোফাইল সংরক্ষিত হয়েছে। এটি এখনো প্রকাশিত নয়।";
+    status.textContent = published ? "আপনার কর্মী প্রোফাইল প্রকাশিত হয়েছে।" : "আপনার কর্মী প্রোফাইল সংরক্ষিত হয়েছে।";
+  } catch (error) {
+    profileMessage.textContent = error.message || "প্রোফাইল সংরক্ষণ করা যায়নি।";
+  } finally {
+    button.disabled = false;
+  }
+});
