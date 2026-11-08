@@ -193,6 +193,8 @@ function renderWorkerCards(workers, profiles, skills) {
 
 async function openWorkerContact(workerId, workerName, headline) {
   selectedWorkerId = workerId;
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) { openModal("login"); say("কর্মীর সঙ্গে যোগাযোগ করতে আগে Customer Account দিয়ে লগইন করুন।"); return; }
   el("contact-title").textContent = workerName;
   el("contact-copy").textContent = headline + " — আপনার কাজের প্রয়োজনটি লিখে পাঠান।";
   el("contact-body").value = "";
@@ -316,6 +318,7 @@ window.addEventListener("load", () => {
     navigator.serviceWorker.register("./sw.js").catch(error => console.info("Offline support unavailable:", error));
   }
   showSession().catch(error => { status.textContent = error.message; });
+  searchWorkers();
 });
 
 
