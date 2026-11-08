@@ -123,7 +123,7 @@ function renderWorkerCards(workers, profiles, skills) {
     const details = document.createElement("p");
     details.className = "worker-meta";
     const gender = worker.gender === "male" ? "পুরুষ" : worker.gender === "female" ? "মহিলা" : "";
-    details.textContent = [profile.area, gender].filter(Boolean).join(" · ") || "লোকেশন উল্লেখ নেই";
+    details.textContent = [profile.area, profile.country, gender].filter(Boolean).join(" · ") || "লোকেশন উল্লেখ নেই";
     const skillsLine = document.createElement("p");
     skillsLine.className = "worker-skills";
     skillsLine.textContent = "দক্ষতা: " + (workerSkills.map(s => s.skill || s.profession).filter(Boolean).join(", ") || worker.headline || "তথ্য যোগ করা হয়নি");
@@ -157,7 +157,7 @@ async function searchWorkers() {
     const ids = (workers || []).map(w => w.user_id);
     if (!ids.length) { el("status").textContent = "এখনো কোনো প্রকাশিত কর্মী প্রোফাইল নেই।"; return; }
     const [p, s] = await Promise.all([
-      db.from("el_profiles").select("id,display_name,area").in("id", ids),
+      db.from("el_profiles").select("id,display_name,area,country").in("id", ids),
       db.from("el_worker_skills").select("worker_id,profession,skill").in("worker_id", ids)
     ]);
     if (p.error) throw p.error; if (s.error) throw s.error;
@@ -168,7 +168,7 @@ async function searchWorkers() {
       const profile = profiles.get(w.user_id) || {};
       const workerSkills = skills.get(w.user_id) || [];
       const professionMatch = !profession || (w.headline || "").toLowerCase().includes(profession) || workerSkills.some(x => ((x.profession || "") + " " + (x.skill || "")).toLowerCase().includes(profession));
-      const areaMatch = !area || (profile.area || "").toLowerCase().includes(area);
+      const areaMatch = !area || ((profile.area || "") + " " + (profile.country || "")).toLowerCase().includes(area);
       return professionMatch && areaMatch;
     });
     if (!matches.length) { el("status").textContent = "আপনার অনুসন্ধানে কোনো কর্মী পাওয়া যায়নি।"; return; }
@@ -187,20 +187,25 @@ window.openEnziLinkProfile = async () => {
     const { data: { user }, error: authError } = await db.auth.getUser();
     if (authError) throw authError;
     if (!user) { el("profile-dialog").close(); openAccount("login"); say("কর্মী প্রোফাইল তৈরি বা সম্পাদনা করতে লগইন করুন।"); return; }
-    const { data: profile, error: pError } = await db.from("el_profiles").select("display_name,role,area").eq("id", user.id).single();
+    const { data: profile, error: pError } = await db.from("el_profiles").select("display_name,role,area,country").eq("id", user.id).single();
     if (pError) throw pError;
     if (profile.role !== "worker") { const { error } = await db.rpc("el_become_worker"); if (error) throw error; }
     const { data: worker, error: wError } = await db.from("el_worker_profiles").select("headline,is_published,contact_phone,gender,whatsapp_phone,photo_url").eq("user_id", user.id).maybeSingle();
     if (wError) throw wError;
     const { data: skills, error: sError } = await db.from("el_worker_skills").select("profession,skill").eq("worker_id", user.id);
     if (sError) throw sError;
+    const { data: privateInfo, error: privateError } = await db.from("el_worker_private").select("date_of_birth").eq("user_id", user.id).maybeSingle();
+    if (privateError) throw privateError;
     el("profile-name").value = profile.display_name || user.user_metadata?.display_name || "";
     el("profile-area").value = profile.area || "";
+    el("profile-country").value = profile.country || "Bangladesh";
+    el("profile-dob").value = privateInfo?.date_of_birth || "";
+    el("profile-professions").value = [...new Set((skills || []).map(x => x.profession).filter(Boolean))].join(", ");
     el("profile-headline").value = worker?.headline || "";
     el("profile-phone").value = worker?.contact_phone || "";
     el("profile-whatsapp").value = worker?.whatsapp_phone || "";
     el("profile-gender").value = worker?.gender || "";
-    el("profile-skills").value = (skills || []).map(x => x.skill || x.profession).join(", ");
+    el("profile-skills").value = [...new Set((skills || []).map(x => x.skill).filter(Boolean))].join(", ");
     el("profile-publish").checked = !!worker?.is_published;
     currentPhotoUrl = worker?.photo_url || "";
     el("photo-preview").src = currentPhotoUrl; el("photo-preview").hidden = !currentPhotoUrl;
@@ -248,11 +253,21 @@ el("worker-profile-form").addEventListener("submit", async event => {
     const { data: { user }, error: authError } = await db.auth.getUser();
     if (authError || !user) throw new Error("আবার লগইন করুন।");
     const name = el("profile-name").value.trim(), area = el("profile-area").value.trim();
-    const headline = el("profile-headline").value.trim(), phone = el("profile-phone").value.trim();
+    const country = el("profile-country").value.trim();
+    const dob = el("profile-dob").value;
+    const professions = [...new Set(el("profile-professions").value.split(",").map(x => x.trim()).filter(Boolean))];
+    const headlineInput = el("profile-headline").value.trim();
+    const headline = headlineInput || professions.join(" · ");
+    const phone = el("profile-phone").value.trim();
     const whatsapp = el("profile-whatsapp").value.trim();
-    const skills = el("profile-skills").value.split(",").map(x => x.trim()).filter(Boolean);
+    const skills = [...new Set(el("profile-skills").value.split(",").map(x => x.trim()).filter(Boolean))];
     const published = el("profile-publish").checked;
-    if (!name || !area || !headline || !phone || !skills.length) throw new Error("নাম, এলাকা, পেশা, ফোন ও দক্ষতা পূরণ করুন।");
+    if (!name || !area || !country || !dob || !professions.length || !phone) throw new Error("Name, country, city/area, date of birth, at least one profession and phone number are required.");
+    const adultCutoff = new Date(); adultCutoff.setHours(0,0,0,0); adultCutoff.setFullYear(adultCutoff.getFullYear()-18);
+    const dobDate = new Date(dob + "T00:00:00");
+    if (Number.isNaN(dobDate.getTime()) || dobDate > adultCutoff) {
+      if (published) throw new Error("Public worker profiles are available only to adults aged 18 or older.");
+    }
     if (normalizePhone(phone).replace(/\D/g, "").length < 7) throw new Error("সঠিক ফোন নম্বর লিখুন।");
     if (whatsapp && normalizePhone(whatsapp).replace(/\D/g, "").length < 7) throw new Error("সঠিক WhatsApp নম্বর লিখুন।");
     if (published && !el("profile-adult").checked) throw new Error("প্রোফাইল প্রকাশ করতে হলে নিশ্চিত করুন আপনার বয়স ১৮ বছর বা তার বেশি।");
@@ -265,7 +280,9 @@ el("worker-profile-form").addEventListener("submit", async event => {
       if (uploadError) throw uploadError;
       const { data } = db.storage.from("worker-photos").getPublicUrl(path); photoUrl = data.publicUrl;
     }
-    const { error: pError } = await db.from("el_profiles").update({ display_name: name, area, updated_at: new Date().toISOString() }).eq("id", user.id);
+    const { error: privateError } = await db.from("el_worker_private").upsert({ user_id: user.id, date_of_birth: dob, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+    if (privateError) throw privateError;
+    const { error: pError } = await db.from("el_profiles").update({ display_name: name, area, country, updated_at: new Date().toISOString() }).eq("id", user.id);
     if (pError) throw pError;
     const { error: wError } = await db.from("el_worker_profiles").upsert({
       user_id: user.id, headline, contact_phone: phone, whatsapp_phone: whatsapp || null,
@@ -275,7 +292,11 @@ el("worker-profile-form").addEventListener("submit", async event => {
     if (wError) throw wError;
     const { error: dError } = await db.from("el_worker_skills").delete().eq("worker_id", user.id);
     if (dError) throw dError;
-    const { error: sError } = await db.from("el_worker_skills").insert(skills.map(skill => ({ worker_id: user.id, profession: headline, skill })));
+    const skillRows = [
+      ...professions.map(profession => ({ worker_id: user.id, profession, skill: null })),
+      ...skills.map(skill => ({ worker_id: user.id, profession: professions[0], skill }))
+    ];
+    const { error: sError } = await db.from("el_worker_skills").insert(skillRows);
     if (sError) throw sError;
     currentPhotoUrl = photoUrl;
     profileSay(published ? "আপনার প্রোফাইল প্রকাশিত হয়েছে। গ্রাহকরা এখন দেখতে পারবেন।" : "প্রোফাইল সংরক্ষিত হয়েছে, কিন্তু প্রকাশিত নয়।");
@@ -283,5 +304,7 @@ el("worker-profile-form").addEventListener("submit", async event => {
   } catch (error) { profileSay(error.message || "প্রোফাইল সংরক্ষণ করা যায়নি।"); }
   finally { button.disabled = false; }
 });
+const dobMax = new Date(); dobMax.setHours(0,0,0,0); dobMax.setFullYear(dobMax.getFullYear()-18);
+el("profile-dob").max = [dobMax.getFullYear(), String(dobMax.getMonth()+1).padStart(2,"0"), String(dobMax.getDate()).padStart(2,"0")].join("-");
 el("year").textContent = new Date().getFullYear();
 window.addEventListener("load", async () => { try { await refreshSession(); } catch (_) {} await searchWorkers(); });
