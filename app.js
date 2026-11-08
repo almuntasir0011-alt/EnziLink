@@ -56,7 +56,7 @@ el("resend-confirmation").addEventListener("click", async () => {
     const { error } = await db.auth.resend({
       type: "signup",
       email,
-      options: { emailRedirectTo: "https://almuntasir0011-alt.github.io/" }
+      options: { emailRedirectTo: "https://almuntasir0011-alt.github.io/EnziLink/" }
     });
     if (error) throw error;
     say("নিশ্চিতকরণ ইমেইল পাঠানোর অনুরোধ করা হয়েছে। Gmail-এর Inbox ও Spam ফোল্ডার দেখুন।");
@@ -120,7 +120,7 @@ form.addEventListener("submit", async event => {
         password: el("account-password").value,
         options: {
           data: { display_name: el("account-name").value.trim() },
-          emailRedirectTo: "https://almuntasir0011-alt.github.io/"
+          emailRedirectTo: "https://almuntasir0011-alt.github.io/EnziLink/"
         }
       });
       if (error) throw error;
