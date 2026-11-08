@@ -1,4 +1,4 @@
-const CACHE_NAME='enzilink-pwa-v4';
+const CACHE_NAME='enzilink-pwa-v5';
 const APP_SHELL=['./','./index.html','./styles.css','./app.js','./manifest.webmanifest','./icon.svg'];
 
 self.addEventListener('install', event => {
