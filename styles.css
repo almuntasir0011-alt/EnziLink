@@ -30,3 +30,9 @@ dialog .consent-line input{width:18px;height:18px;margin-top:2px;flex:0 0 auto}
 .footer-notice{width:100%;color:#a9b8cb;font-size:11px;line-height:1.7}
 #profile-dialog{max-height:90vh;overflow:auto}
 @media(max-width:560px){.worker-avatar{width:72px;height:72px}.worker-results{grid-template-columns:1fr}.worker-card{padding:16px}}
+
+
+.password-field{display:flex;gap:8px;align-items:stretch}
+.password-field input{flex:1;width:0}
+.password-toggle{flex:0 0 auto;padding:0 13px;background:#203b5b;border:1px solid #49698f;color:#f4f7fc;border-radius:10px;font-size:12px}
+#message{color:#ffd18a;line-height:1.6;min-height:18px}
