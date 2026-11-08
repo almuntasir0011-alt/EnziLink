@@ -248,6 +248,21 @@ el("profile-photo").addEventListener("change", () => {
   el("photo-preview").src = URL.createObjectURL(file); el("photo-preview").hidden = false;
 });
 el("profile-close").addEventListener("click", () => el("profile-dialog").close());
+
+el("profile-switch-account").addEventListener("click", async () => {
+  const button = el("profile-switch-account"); button.disabled = true;
+  try {
+    const { error } = await db.auth.signOut();
+    if (error) throw error;
+    currentUserId = null;
+    await refreshSession();
+    el("profile-dialog").close();
+    openAccount("login");
+    say("Signed out. Log in with the email account that owns the existing worker profile to edit it.");
+  } catch (error) {
+    profileSay(error.message || "Could not switch accounts. Please try again.");
+  } finally { button.disabled = false; }
+});
 el("worker-profile-form").addEventListener("submit", async event => {
   event.preventDefault();
   const button = el("profile-save"); button.disabled = true; profileSay("সংরক্ষণ হচ্ছে…");
