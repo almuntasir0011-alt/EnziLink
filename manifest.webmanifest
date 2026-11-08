@@ -1,0 +1,17 @@
+{
+  "id": "./",
+  "name": "EnziLink — Technician & Service Marketplace",
+  "short_name": "EnziLink",
+  "description": "Connect Skills. Create Opportunities.",
+  "lang": "bn",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#080f1d",
+  "theme_color": "#080f1d",
+  "categories": ["business", "productivity", "social"],
+  "icons": [
+    {"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}
