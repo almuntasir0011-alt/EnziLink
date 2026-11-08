@@ -51,5 +51,21 @@
 <label style="display:flex;align-items:center;gap:9px"><input id="profile-publish" type="checkbox" style="width:auto"> প্রোফাইলটি কর্মী খোঁজার তালিকায় প্রকাশ করুন</label>
 <button id="profile-save" class="primary">প্রোফাইল সংরক্ষণ করুন</button>
 </form><p id="profile-message" aria-live="polite"></p></dialog>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="app.js?v=profile-fix-2"></script>
+<script>
+/* Keep the profile dialog responsive even if the Supabase CDN is unavailable. */
+(() => {
+  const open = document.getElementById("profile-open");
+  const dialog = document.getElementById("profile-dialog");
+  const note = document.getElementById("profile-message");
+  const close = document.getElementById("profile-close");
+  if (open && dialog) open.addEventListener("click", () => {
+    if (!dialog.open) dialog.showModal();
+    if (!window.supabase) note.textContent = "অ্যাকাউন্ট সংযোগের লাইব্রেরি লোড হয়নি। ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।";
+  }, true);
+  if (close && dialog) close.addEventListener("click", () => dialog.close());
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
+  onerror="this.onerror=null;this.src='https://unpkg.com/@supabase/supabase-js@2';"></script>
+<script src="app.js?v=profile-fix-3"></script>
 </body></html>
