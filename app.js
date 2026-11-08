@@ -1,166 +1,104 @@
 const SUPABASE_URL = "https://dihxwbpkltjdvqzmfnmz.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_jrSQsPIaJui421VMa6wUbQ_Y-S8uhK4";
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
-
-const modal = document.querySelector("#modal");
-const title = document.querySelector("#modal-title");
-const copy = document.querySelector("#modal-copy");
-const form = document.querySelector("#account-form");
-const message = document.querySelector("#message");
-const status = document.querySelector("#status");
-let mode = "login";
-
 const el = id => document.getElementById(id);
-const say = text => { message.textContent = text; };
-const setVisible = (id, visible) => { el(id).hidden = !visible; };
+const say = value => { el("message").textContent = value; };
+const profileSay = value => { el("profile-message").textContent = value; };
+let mode = "login";
+let currentPhotoUrl = "";
 
-function openModal(nextMode) {
+function openAccount(nextMode) {
   mode = nextMode;
-  const config = {
-    login: ["লগইন", "আপনার EnziLink অ্যাকাউন্টে প্রবেশ করুন।", "লগইন করুন"],
-    join: ["EnziLink-এ যুক্ত হোন", "গ্রাহক বা কর্মী হিসেবে বিনামূল্যে অ্যাকাউন্ট তৈরি করুন।", "অ্যাকাউন্ট তৈরি করুন"],
-    post: ["কাজ পোস্ট করুন", "কাজ পোস্ট করতে আগে লগইন করুন।", "কাজ জমা দিন"]
-  }[mode];
-  title.textContent = config[0];
-  copy.textContent = config[1];
-  el("account-submit").textContent = config[2];
-  setVisible("resend-confirmation", mode === "login");
-  setVisible("name-field", mode === "join");
-  setVisible("role-field", mode === "join");
-  setVisible("email-field", mode !== "post");
-  setVisible("password-field", mode !== "post");
-  setVisible("job-fields", mode === "post");
-  el("account-email").required = mode !== "post";
-  el("account-password").required = mode !== "post";
+  el("modal-title").textContent = mode === "login" ? "লগইন" : "EnziLink-এ যুক্ত হোন";
+  el("modal-copy").textContent = mode === "login" ? "আপনার EnziLink অ্যাকাউন্টে প্রবেশ করুন।" : "কর্মী হিসেবে প্রোফাইল প্রকাশ করতে অথবা গ্রাহক হিসেবে অ্যাকাউন্ট তৈরি করতে পারেন।";
+  el("account-submit").textContent = mode === "login" ? "লগইন করুন" : "অ্যাকাউন্ট তৈরি করুন";
+  el("name-field").hidden = mode !== "join";
+  el("role-field").hidden = mode !== "join";
+  el("resend-confirmation").hidden = mode !== "login";
   el("account-name").required = mode === "join";
-  el("job-title").required = mode === "post";
-  el("job-profession").required = mode === "post";
-  el("job-area").required = mode === "post";
-  el("job-description").required = mode === "post";
+  el("account-form").reset();
   say("");
-  form.reset();
-  modal.showModal();
+  el("account-dialog").showModal();
 }
-
-document.querySelectorAll("[data-open]").forEach(button => {
-  button.addEventListener("click", () => openModal(button.dataset.open));
-});
-el("close").addEventListener("click", () => modal.close());
+document.querySelectorAll("[data-account]").forEach(button => button.addEventListener("click", () => openAccount(button.dataset.account)));
+el("account-close").addEventListener("click", () => el("account-dialog").close());
 
 el("resend-confirmation").addEventListener("click", async () => {
   const email = el("account-email").value.trim();
-  if (!email) { say("আগে আপনার নিবন্ধিত Gmail ঠিকানাটি লিখুন।"); return; }
-  const button = el("resend-confirmation");
-  button.disabled = true;
+  if (!email) { say("আগে নিবন্ধিত ইমেইল ঠিকানাটি লিখুন।"); return; }
   try {
-    const { error } = await db.auth.resend({
-      type: "signup",
-      email,
-      options: { emailRedirectTo: "https://almuntasir0011-alt.github.io/EnziLink/" }
-    });
+    const { error } = await db.auth.resend({ type: "signup", email, options: { emailRedirectTo: "https://almuntasir0011-alt.github.io/EnziLink/" } });
     if (error) throw error;
-    say("নিশ্চিতকরণ ইমেইল পাঠানোর অনুরোধ করা হয়েছে। Gmail-এর Inbox ও Spam ফোল্ডার দেখুন।");
-  } catch (error) {
-    say(error.message || "ইমেইল পাঠানো যায়নি।");
-  } finally {
-    button.disabled = false;
-  }
+    say("নিশ্চিতকরণ ইমেইল পাঠানোর অনুরোধ করা হয়েছে। Inbox ও Spam দেখুন।");
+  } catch (error) { say(error.message || "ইমেইল পাঠানো যায়নি।"); }
 });
 
 async function ensureWorkerRole() {
-  const { data: { user }, error: userError } = await db.auth.getUser();
-  if (userError || !user) throw new Error("প্রথমে লগইন করুন।");
-  const { data: profile, error: profileError } = await db
-    .from("el_profiles").select("role").eq("id", user.id).maybeSingle();
-  if (profileError) throw profileError;
-  if (profile?.role !== "worker") {
-    const { error } = await db.rpc("el_become_worker");
-    if (error) throw error;
+  const { data: { user }, error: authError } = await db.auth.getUser();
+  if (authError || !user) throw new Error("প্রথমে লগইন করুন।");
+  const { data: profile, error } = await db.from("el_profiles").select("role").eq("id", user.id).single();
+  if (error) throw error;
+  if (profile.role !== "worker") {
+    const { error: roleError } = await db.rpc("el_become_worker");
+    if (roleError) throw roleError;
   }
-  const { error: workerError } = await db.from("el_worker_profiles").upsert(
-    { user_id: user.id, is_published: false },
-    { onConflict: "user_id" }
-  );
+  const { error: workerError } = await db.from("el_worker_profiles").upsert({ user_id: user.id, is_published: false }, { onConflict: "user_id" });
   if (workerError) throw workerError;
 }
-
-async function showSession() {
+async function refreshSession() {
   const { data: { user } } = await db.auth.getUser();
-  if (user) {
-    status.textContent = "লগইন করা আছে: " + user.email;
-    const pendingRole = localStorage.getItem("enzilink_requested_role");
-    if (pendingRole === "worker") {
-      await ensureWorkerRole();
-      localStorage.removeItem("enzilink_requested_role");
-      status.textContent = "কর্মী অ্যাকাউন্ট প্রস্তুত। প্রোফাইল সম্পূর্ণ করে প্রকাশ করুন।";
-    }
-  } else {
-    status.textContent = "কর্মী খুঁজতে, কাজ পোস্ট করতে বা আবেদন করতে লগইন করুন।";
-  }
+  el("session-note").textContent = user ? "লগইন করা আছে: " + (user.email || "EnziLink account") : "কর্মী প্রোফাইল তৈরি করতে লগইন করুন। গ্রাহকদের লগইন ছাড়াই কর্মী খোঁজা যাবে।";
 }
-
-form.addEventListener("submit", async event => {
+el("account-form").addEventListener("submit", async event => {
   event.preventDefault();
-  const submit = el("account-submit");
-  submit.disabled = true;
+  const button = el("account-submit");
+  button.disabled = true;
   try {
     if (mode === "login") {
-      const { error } = await db.auth.signInWithPassword({
-        email: el("account-email").value.trim(),
-        password: el("account-password").value
-      });
+      const { error } = await db.auth.signInWithPassword({ email: el("account-email").value.trim(), password: el("account-password").value });
       if (error) throw error;
-      await showSession();
+      await refreshSession();
       say("লগইন সফল হয়েছে।");
-      setTimeout(() => modal.close(), 600);
-    } else if (mode === "join") {
-      const requestedRole = el("account-role").value;
+      setTimeout(() => el("account-dialog").close(), 500);
+    } else {
+      const role = el("account-role").value;
       const { data, error } = await db.auth.signUp({
-        email: el("account-email").value.trim(),
-        password: el("account-password").value,
-        options: {
-          data: { display_name: el("account-name").value.trim() },
-          emailRedirectTo: "https://almuntasir0011-alt.github.io/EnziLink/"
-        }
+        email: el("account-email").value.trim(), password: el("account-password").value,
+        options: { data: { display_name: el("account-name").value.trim() }, emailRedirectTo: "https://almuntasir0011-alt.github.io/EnziLink/" }
       });
       if (error) throw error;
-      localStorage.setItem("enzilink_requested_role", requestedRole);
+      localStorage.setItem("enzilink_requested_role", role);
       if (data.session) {
-        await showSession();
+        if (role === "worker") await ensureWorkerRole();
+        await refreshSession();
         say("অ্যাকাউন্ট তৈরি হয়েছে।");
-      } else {
-        setVisible("resend-confirmation", true);
-        say("অ্যাকাউন্ট তৈরি হয়েছে। ইমেইল না পেলে নিচের বাটনে নিশ্চিতকরণ ইমেইল আবার পাঠান। Gmail-এর Spam ও Promotions ফোল্ডারও দেখুন।");
-      }
-    } else if (mode === "post") {
-      const { data: { user }, error: authError } = await db.auth.getUser();
-      if (authError || !user) throw new Error("কাজ পোস্ট করার আগে লগইন করুন।");
-      const { error } = await db.from("el_service_requests").insert({
-        customer_id: user.id,
-        title: el("job-title").value.trim(),
-        description: el("job-description").value.trim(),
-        profession: el("job-profession").value.trim(),
-        area: el("job-area").value.trim()
-      });
-      if (error) throw error;
-      say("আপনার কাজের পোস্ট সফলভাবে সংরক্ষিত হয়েছে।");
-      setTimeout(() => modal.close(), 900);
+      } else say("অ্যাকাউন্ট তৈরি হয়েছে। ইমেইল নিশ্চিত করে লগইন করুন। Inbox ও Spam দেখুন।");
     }
-  } catch (error) {
-    say(error.message || "অনুরোধটি সম্পন্ন করা যায়নি।");
-  } finally {
-    submit.disabled = false;
-  }
+  } catch (error) { say(error.message || "অনুরোধটি সম্পন্ন করা যায়নি।"); }
+  finally { button.disabled = false; }
 });
 
-let selectedWorkerId = null;
-
-function normalizePhoneForTel(value) {
-  const bengaliDigits = "০১২৩৪৫৬৭৮৯";
-  const ascii = String(value || "").replace(/[০-৯]/g, digit => String(bengaliDigits.indexOf(digit)));
-  return ascii.replace(/[^0-9+*#,;]/g, "");
+function normalizePhone(value) {
+  const bn = "০১২৩৪৫৬৭৮৯";
+  return String(value || "").replace(/[০-৯]/g, d => String(bn.indexOf(d))).replace(/[^0-9+]/g, "");
 }
-
+function whatsappUrl(value) {
+  let digits = normalizePhone(value).replace(/\D/g, "");
+  if (digits.startsWith("0")) digits = "88" + digits;
+  return digits ? "https://wa.me/" + digits : "";
+}
+function workerEmoji(headline) {
+  const value = String(headline || "").toLowerCase();
+  if (/electric|electrical|বিদ্যুৎ|ইলেক/.test(value)) return "⚡";
+  if (/plumb|প্লাম্ব/.test(value)) return "🔧";
+  if (/weld|ওয়েল্ড/.test(value)) return "🧑‍🏭";
+  if (/paint|পেইন্ট/.test(value)) return "🎨";
+  if (/carpent|কাঠ/.test(value)) return "🪚";
+  if (/ac|air condition|এসি/.test(value)) return "❄️";
+  if (/clean|ক্লিন/.test(value)) return "🧹";
+  if (/mason|রাজমিস্ত্রি/.test(value)) return "🧱";
+  return "🧰";
+}
 function renderWorkerCards(workers, profiles, skills) {
   const container = el("worker-results");
   container.replaceChildren();
@@ -169,268 +107,145 @@ function renderWorkerCards(workers, profiles, skills) {
     const workerSkills = skills.get(worker.user_id) || [];
     const card = document.createElement("article");
     card.className = "worker-card";
+    const avatar = document.createElement("div");
+    avatar.className = "worker-avatar";
+    if (worker.photo_url) {
+      const img = document.createElement("img");
+      img.src = worker.photo_url; img.alt = "কর্মীর প্রোফাইল ছবি"; avatar.append(img);
+    } else avatar.textContent = workerEmoji(worker.headline);
     const name = document.createElement("h3");
     name.textContent = profile.display_name || "EnziLink কর্মী";
     const headline = document.createElement("p");
-    headline.className = "worker-headline";
-    headline.textContent = worker.headline || "দক্ষ কর্মী";
-    const meta = document.createElement("p");
-    meta.className = "worker-meta";
-    meta.textContent = (profile.area || "এলাকা উল্লেখ নেই") + " · অভিজ্ঞতা: " +
-      (worker.years_experience ?? "উল্লেখ নেই") + (worker.years_experience == null ? "" : " বছর");
-    const bio = document.createElement("p");
-    bio.className = "worker-bio";
-    bio.textContent = worker.bio || "এই কর্মী এখনো পরিচিতি যোগ করেননি।";
-    const skillLine = document.createElement("p");
-    skillLine.className = "worker-skills";
-    skillLine.textContent = "দক্ষতা: " + (workerSkills.map(s => s.skill || s.profession).filter(Boolean).join(", ") || "তথ্য যোগ করা হয়নি");
-    const verified = document.createElement("span");
-    verified.className = "worker-verification";
-    verified.textContent = worker.verification_status === "verified" ? "✓ যাচাইকৃত" : "যাচাই হয়নি";
-    const phone = String(worker.contact_phone || "").trim();
-    const telNumber = normalizePhoneForTel(phone);
-    let callElement;
-    if (telNumber) {
-      callElement = document.createElement("a");
-      callElement.className = "primary worker-call";
-      callElement.href = "tel:" + telNumber;
-      callElement.textContent = "☎ কল করুন · " + phone;
-      callElement.setAttribute("aria-label", name.textContent + " কে ফোন করুন");
-    } else {
-      callElement = document.createElement("span");
-      callElement.className = "worker-no-phone";
-      callElement.textContent = "ফোন নম্বর যোগ করা হয়নি";
+    headline.className = "worker-headline"; headline.textContent = worker.headline || "দক্ষ কর্মী";
+    const details = document.createElement("p");
+    details.className = "worker-meta";
+    const gender = worker.gender === "male" ? "পুরুষ" : worker.gender === "female" ? "মহিলা" : "";
+    details.textContent = [profile.area, gender].filter(Boolean).join(" · ") || "লোকেশন উল্লেখ নেই";
+    const skillsLine = document.createElement("p");
+    skillsLine.className = "worker-skills";
+    skillsLine.textContent = "দক্ষতা: " + (workerSkills.map(s => s.skill || s.profession).filter(Boolean).join(", ") || worker.headline || "তথ্য যোগ করা হয়নি");
+    card.append(avatar, name, headline, details, skillsLine);
+    const phone = normalizePhone(worker.contact_phone);
+    if (phone) {
+      const call = document.createElement("a");
+      call.className = "primary worker-call"; call.href = "tel:" + phone; call.textContent = "☎ কল করুন"; card.append(call);
     }
-    const contact = document.createElement("button");
-    contact.type = "button";
-    contact.className = "outline worker-contact";
-    contact.textContent = "বার্তা পাঠান";
-    contact.addEventListener("click", () => openWorkerContact(worker.user_id, name.textContent, headline.textContent));
-    card.append(name, headline, meta, bio, skillLine, verified, callElement, contact);
+    const wa = whatsappUrl(worker.whatsapp_phone || worker.contact_phone);
+    if (worker.whatsapp_phone && wa) {
+      const message = document.createElement("a");
+      message.className = "outline worker-whatsapp"; message.href = wa; message.target = "_blank"; message.rel = "noopener noreferrer"; message.textContent = "WhatsApp মেসেজ"; card.append(message);
+    }
     container.append(card);
   });
 }
-
-async function openWorkerContact(workerId, workerName, headline) {
-  selectedWorkerId = workerId;
-  const { data: { user } } = await db.auth.getUser();
-  if (!user) { openModal("login"); say("কর্মীর সঙ্গে যোগাযোগ করতে আগে Customer Account দিয়ে লগইন করুন।"); return; }
-  el("contact-title").textContent = workerName;
-  el("contact-copy").textContent = headline + " — আপনার কাজের প্রয়োজনটি লিখে পাঠান।";
-  el("contact-body").value = "";
-  el("contact-message").textContent = "";
-  el("contact-dialog").showModal();
-}
-
-el("contact-close").addEventListener("click", () => el("contact-dialog").close());
-el("contact-form").addEventListener("submit", async event => {
-  event.preventDefault();
-  const button = el("contact-send");
-  button.disabled = true;
-  el("contact-message").textContent = "বার্তা পাঠানো হচ্ছে…";
-  try {
-    const { data: { user }, error: authError } = await db.auth.getUser();
-    if (authError || !user) throw new Error("বার্তা পাঠাতে আগে Customer Account দিয়ে লগইন করুন।");
-    if (user.id === selectedWorkerId) throw new Error("নিজের প্রোফাইলে বার্তা পাঠানো যাবে না।");
-    const { data: profile, error: pError } = await db.from("el_profiles")
-      .select("role").eq("id", user.id).single();
-    if (pError) throw pError;
-    if (profile.role !== "customer") throw new Error("কর্মী প্রোফাইল থেকে যোগাযোগ করতে Customer Account ব্যবহার করুন।");
-    let { data: conversation, error: cError } = await db.from("el_conversations")
-      .select("id").eq("customer_id", user.id).eq("worker_id", selectedWorkerId)
-      .is("request_id", null).maybeSingle();
-    if (cError) throw cError;
-    if (!conversation) {
-      const created = await db.from("el_conversations").insert({
-        customer_id: user.id, worker_id: selectedWorkerId, request_id: null
-      }).select("id").single();
-      if (created.error) throw created.error;
-      conversation = created.data;
-    }
-    const { error: mError } = await db.from("el_messages").insert({
-      conversation_id: conversation.id, sender_id: user.id,
-      body: el("contact-body").value.trim()
-    });
-    if (mError) throw mError;
-    el("contact-message").textContent = "বার্তা পাঠানো হয়েছে। কর্মী তার EnziLink অ্যাকাউন্টে এটি দেখতে পারবেন।";
-    el("contact-body").value = "";
-  } catch (error) {
-    el("contact-message").textContent = error.message || "বার্তা পাঠানো যায়নি।";
-  } finally {
-    button.disabled = false;
-  }
-});
-
 async function searchWorkers() {
   const profession = el("profession").value.trim().toLowerCase();
   const area = el("area").value.trim().toLowerCase();
-  status.textContent = "কর্মী খোঁজা হচ্ছে…";
-  el("worker-results").replaceChildren();
+  el("status").textContent = "কর্মী খোঁজা হচ্ছে…"; el("worker-results").replaceChildren();
   try {
-    const { data: workers, error } = await db.from("el_worker_profiles")
-      .select("user_id,headline,bio,years_experience,is_published,verification_status,contact_phone")
-      .eq("is_published", true).limit(100);
+    const { data: workers, error } = await db.from("el_worker_profiles").select("user_id,headline,is_published,contact_phone,gender,whatsapp_phone,photo_url").eq("is_published", true).limit(100);
     if (error) throw error;
-    const ids = (workers || []).map(worker => worker.user_id);
-    if (!ids.length) {
-      status.textContent = "এখনো কোনো প্রকাশিত কর্মী প্রোফাইল পাওয়া যায়নি।";
-      return;
-    }
-    const [profilesResult, skillsResult] = await Promise.all([
+    const ids = (workers || []).map(w => w.user_id);
+    if (!ids.length) { el("status").textContent = "এখনো কোনো প্রকাশিত কর্মী প্রোফাইল নেই।"; return; }
+    const [p, s] = await Promise.all([
       db.from("el_profiles").select("id,display_name,area").in("id", ids),
       db.from("el_worker_skills").select("worker_id,profession,skill").in("worker_id", ids)
     ]);
-    if (profilesResult.error) throw profilesResult.error;
-    if (skillsResult.error) throw skillsResult.error;
-    const profiles = new Map((profilesResult.data || []).map(profile => [profile.id, profile]));
+    if (p.error) throw p.error; if (s.error) throw s.error;
+    const profiles = new Map((p.data || []).map(x => [x.id, x]));
     const skills = new Map();
-    for (const skill of (skillsResult.data || [])) {
-      if (!skills.has(skill.worker_id)) skills.set(skill.worker_id, []);
-      skills.get(skill.worker_id).push(skill);
-    }
-    const matches = workers.filter(worker => {
-      const profile = profiles.get(worker.user_id) || {};
-      const workerSkills = skills.get(worker.user_id) || [];
-      const professionMatch = !profession || worker.headline?.toLowerCase().includes(profession) ||
-        workerSkills.some(skill => (skill.profession + " " + (skill.skill || "")).toLowerCase().includes(profession));
-      const areaMatch = !area || profile.area?.toLowerCase().includes(area);
+    (s.data || []).forEach(x => { if (!skills.has(x.worker_id)) skills.set(x.worker_id, []); skills.get(x.worker_id).push(x); });
+    const matches = workers.filter(w => {
+      const profile = profiles.get(w.user_id) || {};
+      const workerSkills = skills.get(w.user_id) || [];
+      const professionMatch = !profession || (w.headline || "").toLowerCase().includes(profession) || workerSkills.some(x => ((x.profession || "") + " " + (x.skill || "")).toLowerCase().includes(profession));
+      const areaMatch = !area || (profile.area || "").toLowerCase().includes(area);
       return professionMatch && areaMatch;
     });
-    if (!matches.length) {
-      status.textContent = "আপনার অনুসন্ধানের সঙ্গে মেলে এমন প্রকাশিত কর্মী পাওয়া যায়নি।";
-      return;
-    }
-    status.textContent = matches.length + " জন প্রকাশিত কর্মী পাওয়া গেছে।";
+    if (!matches.length) { el("status").textContent = "আপনার অনুসন্ধানে কোনো কর্মী পাওয়া যায়নি।"; return; }
+    el("status").textContent = matches.length + " জন কর্মী পাওয়া গেছে।";
     renderWorkerCards(matches, profiles, skills);
-  } catch (error) {
-    status.textContent = "কর্মী তালিকা লোড হয়নি: " + (error.message || "Unknown error");
-  }
+  } catch (error) { el("status").textContent = "কর্মী তালিকা লোড হয়নি: " + (error.message || "Unknown error"); }
 }
-el("search-form").addEventListener("submit", event => {
-  event.preventDefault();
-  searchWorkers();
-});
-
+el("search-form").addEventListener("submit", event => { event.preventDefault(); searchWorkers(); });
 document.querySelectorAll("[data-cat]").forEach(button => button.addEventListener("click", () => {
-  el("profession").value = button.dataset.cat;
-  el("find").scrollIntoView({ behavior: "smooth" });
-  searchWorkers();
+  el("profession").value = button.dataset.cat; el("find").scrollIntoView({ behavior: "smooth" }); searchWorkers();
 }));
 
-el("year").textContent = new Date().getFullYear();
-let installPrompt = null;
-const installButton = el("install-app");
-window.addEventListener("beforeinstallprompt", event => {
-  event.preventDefault();
-  installPrompt = event;
-  installButton.hidden = false;
-});
-installButton.addEventListener("click", async () => {
-  if (!installPrompt) return;
-  installPrompt.prompt();
-  await installPrompt.userChoice;
-  installPrompt = null;
-  installButton.hidden = true;
-});
-window.addEventListener("appinstalled", () => { installButton.hidden = true; });
-window.addEventListener("load", () => {
-  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-    navigator.serviceWorker.register("./sw.js").catch(error => console.info("Offline support unavailable:", error));
-  }
-  showSession().catch(error => { status.textContent = error.message; });
-  searchWorkers();
-});
-
-
-// Worker profile setup: uses the existing authenticated EnziLink account.
-const profileDialog = el("profile-dialog");
-const profileMessage = el("profile-message");
 el("profile-open").addEventListener("click", async () => {
-  // Open the dialog immediately so a slow auth/network check cannot make the
-  // profile button appear unresponsive.
-  profileDialog.showModal();
-  profileMessage.textContent = "অ্যাকাউন্ট যাচাই করা হচ্ছে…";
+  el("profile-dialog").showModal(); profileSay("অ্যাকাউন্ট যাচাই করা হচ্ছে…");
   try {
-    const { data: { user }, error } = await db.auth.getUser();
-    if (error) throw error;
-    if (!user) {
-      profileDialog.close();
-      openModal("login");
-      say("প্রোফাইল তৈরি করতে আগে লগইন করুন।");
-      return;
-    }
-    profileMessage.textContent = "প্রোফাইলের তথ্য লোড হচ্ছে…";
-    const { data: profile, error: pError } = await db.from("el_profiles")
-      .select("display_name,role,area").eq("id", user.id).single();
+    const { data: { user }, error: authError } = await db.auth.getUser();
+    if (authError) throw authError;
+    if (!user) { el("profile-dialog").close(); openAccount("login"); say("কর্মী প্রোফাইল তৈরি বা সম্পাদনা করতে লগইন করুন।"); return; }
+    const { data: profile, error: pError } = await db.from("el_profiles").select("display_name,role,area").eq("id", user.id).single();
     if (pError) throw pError;
-    if (profile.role === "customer") {
-      const { error: roleError } = await db.rpc("el_become_worker");
-      if (roleError) throw roleError;
-    } else if (profile.role !== "worker") {
-      throw new Error("এই অ্যাকাউন্টে কর্মী প্রোফাইল তৈরি করা যাবে না।");
-    }
-    const { data: worker, error: wError } = await db.from("el_worker_profiles")
-      .select("headline,bio,years_experience,is_published,contact_phone").eq("user_id", user.id).maybeSingle();
+    if (profile.role !== "worker") { const { error } = await db.rpc("el_become_worker"); if (error) throw error; }
+    const { data: worker, error: wError } = await db.from("el_worker_profiles").select("headline,is_published,contact_phone,gender,whatsapp_phone,photo_url").eq("user_id", user.id).maybeSingle();
     if (wError) throw wError;
-    const { data: skills, error: sError } = await db.from("el_worker_skills")
-      .select("profession,skill").eq("worker_id", user.id);
+    const { data: skills, error: sError } = await db.from("el_worker_skills").select("profession,skill").eq("worker_id", user.id);
     if (sError) throw sError;
     el("profile-name").value = profile.display_name || user.user_metadata?.display_name || "";
     el("profile-area").value = profile.area || "";
     el("profile-headline").value = worker?.headline || "";
     el("profile-phone").value = worker?.contact_phone || "";
-    el("profile-experience").value = worker?.years_experience ?? "";
-    el("profile-skills").value = (skills || []).map(x => x.skill ? x.profession + ": " + x.skill : x.profession).join(", ");
-    el("profile-bio").value = worker?.bio || "";
-    el("profile-publish").checked = worker?.is_published || false;
-    profileMessage.textContent = worker
-      ? "আপনার আগের প্রোফাইলটি লোড হয়েছে। এই তথ্যগুলো সম্পাদনা করে সংরক্ষণ করুন। একই অ্যাকাউন্টে নতুন প্রোফাইল তৈরি হবে না।"
-      : "এই অ্যাকাউন্টে এখনো Worker Profile নেই। প্রথমবার সংরক্ষণ করলে একটি প্রোফাইল তৈরি হবে; এরপর সেটিই সম্পাদনা করতে পারবেন।";
-  } catch (error) {
-    profileMessage.textContent = error.message || "প্রোফাইল লোড করা যায়নি।";
-  }
+    el("profile-whatsapp").value = worker?.whatsapp_phone || "";
+    el("profile-gender").value = worker?.gender || "";
+    el("profile-skills").value = (skills || []).map(x => x.skill || x.profession).join(", ");
+    el("profile-publish").checked = !!worker?.is_published;
+    currentPhotoUrl = worker?.photo_url || "";
+    el("photo-preview").src = currentPhotoUrl; el("photo-preview").hidden = !currentPhotoUrl;
+    profileSay(worker ? "আপনার আগের প্রোফাইল লোড হয়েছে। প্রয়োজনমতো পরিবর্তন করে সংরক্ষণ করুন।" : "এই অ্যাকাউন্টে এখনো প্রোফাইল নেই। তথ্য পূরণ করে প্রকাশ করতে পারবেন।");
+  } catch (error) { profileSay(error.message || "প্রোফাইল লোড করা যায়নি।"); }
 });
-el("profile-close").addEventListener("click", () => profileDialog.close());
+el("profile-photo").addEventListener("change", () => {
+  const file = el("profile-photo").files?.[0]; if (!file) return;
+  if (!["image/jpeg","image/png","image/webp"].includes(file.type) || file.size > 3 * 1024 * 1024) {
+    profileSay("JPG, PNG বা WEBP ছবি দিন; সর্বোচ্চ ৩ MB।"); el("profile-photo").value = ""; return;
+  }
+  el("photo-preview").src = URL.createObjectURL(file); el("photo-preview").hidden = false;
+});
+el("profile-close").addEventListener("click", () => el("profile-dialog").close());
 el("worker-profile-form").addEventListener("submit", async event => {
   event.preventDefault();
-  const button = el("profile-save");
-  button.disabled = true;
-  profileMessage.textContent = "সংরক্ষণ হচ্ছে…";
+  const button = el("profile-save"); button.disabled = true; profileSay("সংরক্ষণ হচ্ছে…");
   try {
     const { data: { user }, error: authError } = await db.auth.getUser();
-    if (authError || !user) throw new Error("সেশন শেষ হয়েছে। আবার লগইন করুন।");
-    const name = el("profile-name").value.trim();
-    const area = el("profile-area").value.trim();
-    const headline = el("profile-headline").value.trim();
-    const phone = el("profile-phone").value.trim();
-    const experience = Number(el("profile-experience").value);
-    if (phone.length < 7 || phone.length > 25) throw new Error("সঠিক ফোন নম্বর লিখুন (৭–২৫ অক্ষর)।");
-    if (!normalizePhoneForTel(phone)) throw new Error("ফোন নম্বরে অন্তত একটি সংখ্যা থাকতে হবে।");
-    const bio = el("profile-bio").value.trim();
+    if (authError || !user) throw new Error("আবার লগইন করুন।");
+    const name = el("profile-name").value.trim(), area = el("profile-area").value.trim();
+    const headline = el("profile-headline").value.trim(), phone = el("profile-phone").value.trim();
+    const whatsapp = el("profile-whatsapp").value.trim();
+    const skills = el("profile-skills").value.split(",").map(x => x.trim()).filter(Boolean);
     const published = el("profile-publish").checked;
-    const skillItems = el("profile-skills").value.split(",").map(s => s.trim()).filter(Boolean);
-    if (!skillItems.length) throw new Error("অন্তত একটি দক্ষতা লিখুন।");
-    const { error: pError } = await db.from("el_profiles")
-      .update({ display_name: name, area, updated_at: new Date().toISOString() }).eq("id", user.id);
+    if (!name || !area || !headline || !phone || !skills.length) throw new Error("নাম, এলাকা, পেশা, ফোন ও দক্ষতা পূরণ করুন।");
+    if (normalizePhone(phone).replace(/\D/g, "").length < 7) throw new Error("সঠিক ফোন নম্বর লিখুন।");
+    if (whatsapp && normalizePhone(whatsapp).replace(/\D/g, "").length < 7) throw new Error("সঠিক WhatsApp নম্বর লিখুন।");
+    if (published && !el("profile-consent").checked) throw new Error("প্রোফাইল প্রকাশের আগে তথ্য প্রকাশের সম্মতি দিন।");
+    const photo = el("profile-photo").files?.[0]; let photoUrl = currentPhotoUrl;
+    if (photo) {
+      const ext = photo.type === "image/png" ? "png" : photo.type === "image/webp" ? "webp" : "jpg";
+      const path = user.id + "/profile." + ext;
+      const { error: uploadError } = await db.storage.from("worker-photos").upload(path, photo, { upsert: true, contentType: photo.type, cacheControl: "3600" });
+      if (uploadError) throw uploadError;
+      const { data } = db.storage.from("worker-photos").getPublicUrl(path); photoUrl = data.publicUrl;
+    }
+    const { error: pError } = await db.from("el_profiles").update({ display_name: name, area, updated_at: new Date().toISOString() }).eq("id", user.id);
     if (pError) throw pError;
     const { error: wError } = await db.from("el_worker_profiles").upsert({
-      user_id: user.id, headline, bio, years_experience: experience,
-      contact_phone: phone, is_published: published, updated_at: new Date().toISOString()
+      user_id: user.id, headline, contact_phone: phone, whatsapp_phone: whatsapp || null,
+      gender: el("profile-gender").value || null, photo_url: photoUrl || null,
+      is_published: published, updated_at: new Date().toISOString()
     }, { onConflict: "user_id" });
     if (wError) throw wError;
     const { error: dError } = await db.from("el_worker_skills").delete().eq("worker_id", user.id);
     if (dError) throw dError;
-    const { error: sError } = await db.from("el_worker_skills").insert(
-      skillItems.map(item => ({ worker_id: user.id, profession: headline, skill: item }))
-    );
+    const { error: sError } = await db.from("el_worker_skills").insert(skills.map(skill => ({ worker_id: user.id, profession: headline, skill })));
     if (sError) throw sError;
-    profileMessage.textContent = published
-      ? "প্রোফাইল সংরক্ষিত এবং প্রকাশিত হয়েছে।"
-      : "প্রোফাইল সংরক্ষিত হয়েছে। এটি এখনো প্রকাশিত নয়।";
-    status.textContent = published ? "আপনার কর্মী প্রোফাইল প্রকাশিত হয়েছে।" : "আপনার কর্মী প্রোফাইল সংরক্ষিত হয়েছে।";
-  } catch (error) {
-    profileMessage.textContent = error.message || "প্রোফাইল সংরক্ষণ করা যায়নি।";
-  } finally {
-    button.disabled = false;
-  }
+    currentPhotoUrl = photoUrl;
+    profileSay(published ? "আপনার প্রোফাইল প্রকাশিত হয়েছে। গ্রাহকরা এখন দেখতে পারবেন।" : "প্রোফাইল সংরক্ষিত হয়েছে, কিন্তু প্রকাশিত নয়।");
+    el("profile-photo").value = ""; searchWorkers();
+  } catch (error) { profileSay(error.message || "প্রোফাইল সংরক্ষণ করা যায়নি।"); }
+  finally { button.disabled = false; }
 });
+el("year").textContent = new Date().getFullYear();
+window.addEventListener("load", () => { refreshSession().catch(() => {}); searchWorkers(); });
