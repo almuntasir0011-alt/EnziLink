@@ -97,7 +97,10 @@ form.addEventListener("submit", async event => {
       const { data, error } = await db.auth.signUp({
         email: el("account-email").value.trim(),
         password: el("account-password").value,
-        options: { data: { display_name: el("account-name").value.trim() } }
+        options: {
+          data: { display_name: el("account-name").value.trim() },
+          emailRedirectTo: "https://almuntasir0011-alt.github.io/EnziLink/"
+        }
       });
       if (error) throw error;
       localStorage.setItem("enzilink_requested_role", requestedRole);
