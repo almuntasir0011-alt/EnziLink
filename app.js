@@ -56,7 +56,7 @@ el("resend-confirmation").addEventListener("click", async () => {
     const { error } = await db.auth.resend({
       type: "signup",
       email,
-      options: { emailRedirectTo: "https://almuntasir0011-alt.github.io/EnziLink/" }
+      options: { emailRedirectTo: "https://almuntasir0011-alt.github.io/" }
     });
     if (error) throw error;
     say("নিশ্চিতকরণ ইমেইল পাঠানোর অনুরোধ করা হয়েছে। Gmail-এর Inbox ও Spam ফোল্ডার দেখুন।");
@@ -120,7 +120,7 @@ form.addEventListener("submit", async event => {
         password: el("account-password").value,
         options: {
           data: { display_name: el("account-name").value.trim() },
-          emailRedirectTo: "https://almuntasir0011-alt.github.io/EnziLink/"
+          emailRedirectTo: "https://almuntasir0011-alt.github.io/"
         }
       });
       if (error) throw error;
@@ -129,7 +129,8 @@ form.addEventListener("submit", async event => {
         await showSession();
         say("অ্যাকাউন্ট তৈরি হয়েছে।");
       } else {
-        say("অ্যাকাউন্ট তৈরি হয়েছে। ইমেইলে পাঠানো নিশ্চিতকরণ লিংকে ক্লিক করে তারপর লগইন করুন।");
+        setVisible("resend-confirmation", true);
+        say("অ্যাকাউন্ট তৈরি হয়েছে। ইমেইল না পেলে নিচের বাটনে নিশ্চিতকরণ ইমেইল আবার পাঠান। Gmail-এর Spam ও Promotions ফোল্ডারও দেখুন।");
       }
     } else if (mode === "post") {
       const { data: { user }, error: authError } = await db.auth.getUser();
