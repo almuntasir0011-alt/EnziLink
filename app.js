@@ -383,7 +383,9 @@ el("profile-open").addEventListener("click", async () => {
     el("profile-skills").value = (skills || []).map(x => x.skill ? x.profession + ": " + x.skill : x.profession).join(", ");
     el("profile-bio").value = worker?.bio || "";
     el("profile-publish").checked = worker?.is_published || false;
-    profileMessage.textContent = "তথ্য পূরণ করে সংরক্ষণ করুন।";
+    profileMessage.textContent = worker
+      ? "আপনার আগের প্রোফাইলটি লোড হয়েছে। এই তথ্যগুলো সম্পাদনা করে সংরক্ষণ করুন। একই অ্যাকাউন্টে নতুন প্রোফাইল তৈরি হবে না।"
+      : "এই অ্যাকাউন্টে এখনো Worker Profile নেই। প্রথমবার সংরক্ষণ করলে একটি প্রোফাইল তৈরি হবে; এরপর সেটিই সম্পাদনা করতে পারবেন।";
   } catch (error) {
     profileMessage.textContent = error.message || "প্রোফাইল লোড করা যায়নি।";
   }
