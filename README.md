@@ -22,7 +22,7 @@ Bangladesh-first marketplace connecting customers directly with skilled workers 
 
 ## Remaining work before production
 
-- Worker profile editing, skills management, and publish/unpublish controls.
+- Worker profile editing, skills management, publish/unpublish controls, public contact phone, and click-to-call worker cards are implemented.
 - Worker response, messaging, review, moderation, and admin interfaces.
 - Full customer identity and request-status synchronization with the EnziVolt Customer Portal. At present the two portals cross-link, but their existing account systems and service-request backends are not yet unified.
 - Test signup, email confirmation, login, worker search, and job posting on the deployed website.
