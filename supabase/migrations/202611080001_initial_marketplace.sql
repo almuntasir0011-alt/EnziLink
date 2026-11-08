@@ -126,6 +126,20 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
+-- Users may opt into the worker role, but cannot assign themselves admin.
+create or replace function public.become_worker()
+returns void language plpgsql security definer set search_path = '' as $
+begin
+  update public.profiles set role = 'worker', updated_at = now()
+  where id = auth.uid() and role = 'customer';
+  if not found then
+    raise exception 'Only a customer account can switch to worker';
+  end if;
+end;
+$;
+revoke all on function public.become_worker() from public;
+grant execute on function public.become_worker() to authenticated;
+
 alter table public.profiles enable row level security;
 alter table public.worker_profiles enable row level security;
 alter table public.worker_skills enable row level security;
@@ -144,8 +158,14 @@ revoke update on public.profiles from authenticated;
 grant update (display_name, area, updated_at) on public.profiles to authenticated;
 
 create policy "published_workers_read" on public.worker_profiles for select to anon, authenticated using (is_published = true or user_id = (select auth.uid()));
-create policy "worker_profile_insert_self" on public.worker_profiles for insert to authenticated with check (user_id = (select auth.uid()));
-create policy "worker_profile_update_self" on public.worker_profiles for update to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+create policy "worker_profile_insert_self" on public.worker_profiles for insert to authenticated with check (
+  user_id = (select auth.uid()) and exists (select 1 from public.profiles p where p.id = user_id and p.role = 'worker')
+);
+create policy "worker_profile_update_self" on public.worker_profiles for update to authenticated
+using (user_id = (select auth.uid()))
+with check (user_id = (select auth.uid()) and exists (select 1 from public.profiles p where p.id = user_id and p.role = 'worker'));
+revoke update on public.worker_profiles from authenticated;
+grant update (headline, bio, years_experience, is_published, updated_at) on public.worker_profiles to authenticated;
 
 create policy "skills_read_published_workers" on public.worker_skills for select to anon, authenticated using (
   exists (select 1 from public.worker_profiles wp where wp.user_id = worker_id and (wp.is_published = true or wp.user_id = (select auth.uid())))
