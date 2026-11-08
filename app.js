@@ -153,14 +153,101 @@ form.addEventListener("submit", async event => {
   }
 });
 
+let selectedWorkerId = null;
+
+function renderWorkerCards(workers, profiles, skills) {
+  const container = el("worker-results");
+  container.replaceChildren();
+  workers.forEach(worker => {
+    const profile = profiles.get(worker.user_id) || {};
+    const workerSkills = skills.get(worker.user_id) || [];
+    const card = document.createElement("article");
+    card.className = "worker-card";
+    const name = document.createElement("h3");
+    name.textContent = profile.display_name || "EnziLink কর্মী";
+    const headline = document.createElement("p");
+    headline.className = "worker-headline";
+    headline.textContent = worker.headline || "দক্ষ কর্মী";
+    const meta = document.createElement("p");
+    meta.className = "worker-meta";
+    meta.textContent = (profile.area || "এলাকা উল্লেখ নেই") + " · অভিজ্ঞতা: " +
+      (worker.years_experience ?? "উল্লেখ নেই") + (worker.years_experience == null ? "" : " বছর");
+    const bio = document.createElement("p");
+    bio.className = "worker-bio";
+    bio.textContent = worker.bio || "এই কর্মী এখনো পরিচিতি যোগ করেননি।";
+    const skillLine = document.createElement("p");
+    skillLine.className = "worker-skills";
+    skillLine.textContent = "দক্ষতা: " + (workerSkills.map(s => s.skill || s.profession).filter(Boolean).join(", ") || "তথ্য যোগ করা হয়নি");
+    const verified = document.createElement("span");
+    verified.className = "worker-verification";
+    verified.textContent = worker.verification_status === "verified" ? "✓ যাচাইকৃত" : "যাচাই হয়নি";
+    const contact = document.createElement("button");
+    contact.type = "button";
+    contact.className = "primary worker-contact";
+    contact.textContent = "বার্তা পাঠান";
+    contact.addEventListener("click", () => openWorkerContact(worker.user_id, name.textContent, headline.textContent));
+    card.append(name, headline, meta, bio, skillLine, verified, contact);
+    container.append(card);
+  });
+}
+
+async function openWorkerContact(workerId, workerName, headline) {
+  selectedWorkerId = workerId;
+  el("contact-title").textContent = workerName;
+  el("contact-copy").textContent = headline + " — আপনার কাজের প্রয়োজনটি লিখে পাঠান।";
+  el("contact-body").value = "";
+  el("contact-message").textContent = "";
+  el("contact-dialog").showModal();
+}
+
+el("contact-close").addEventListener("click", () => el("contact-dialog").close());
+el("contact-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const button = el("contact-send");
+  button.disabled = true;
+  el("contact-message").textContent = "বার্তা পাঠানো হচ্ছে…";
+  try {
+    const { data: { user }, error: authError } = await db.auth.getUser();
+    if (authError || !user) throw new Error("বার্তা পাঠাতে আগে Customer Account দিয়ে লগইন করুন।");
+    if (user.id === selectedWorkerId) throw new Error("নিজের প্রোফাইলে বার্তা পাঠানো যাবে না।");
+    const { data: profile, error: pError } = await db.from("el_profiles")
+      .select("role").eq("id", user.id).single();
+    if (pError) throw pError;
+    if (profile.role !== "customer") throw new Error("কর্মী প্রোফাইল থেকে যোগাযোগ করতে Customer Account ব্যবহার করুন।");
+    let { data: conversation, error: cError } = await db.from("el_conversations")
+      .select("id").eq("customer_id", user.id).eq("worker_id", selectedWorkerId)
+      .is("request_id", null).maybeSingle();
+    if (cError) throw cError;
+    if (!conversation) {
+      const created = await db.from("el_conversations").insert({
+        customer_id: user.id, worker_id: selectedWorkerId, request_id: null
+      }).select("id").single();
+      if (created.error) throw created.error;
+      conversation = created.data;
+    }
+    const { error: mError } = await db.from("el_messages").insert({
+      conversation_id: conversation.id, sender_id: user.id,
+      body: el("contact-body").value.trim()
+    });
+    if (mError) throw mError;
+    el("contact-message").textContent = "বার্তা পাঠানো হয়েছে। কর্মী তার EnziLink অ্যাকাউন্টে এটি দেখতে পারবেন।";
+    el("contact-body").value = "";
+  } catch (error) {
+    el("contact-message").textContent = error.message || "বার্তা পাঠানো যায়নি।";
+  } finally {
+    button.disabled = false;
+  }
+});
+
 async function searchWorkers() {
   const profession = el("profession").value.trim().toLowerCase();
   const area = el("area").value.trim().toLowerCase();
   status.textContent = "কর্মী খোঁজা হচ্ছে…";
+  el("worker-results").replaceChildren();
   try {
     const { data: workers, error } = await db.from("el_worker_profiles")
-      .select("user_id,headline,bio,years_experience")
-      .eq("is_published", true).limit(50);
+      .select("user_id,headline,bio,years_experience,is_published,verification_status")
+      .eq("is_published", true).limit(100);
     if (error) throw error;
     const ids = (workers || []).map(worker => worker.user_id);
     if (!ids.length) {
@@ -180,22 +267,19 @@ async function searchWorkers() {
       skills.get(skill.worker_id).push(skill);
     }
     const matches = workers.filter(worker => {
-      const profile = profiles.get(worker.user_id);
+      const profile = profiles.get(worker.user_id) || {};
       const workerSkills = skills.get(worker.user_id) || [];
       const professionMatch = !profession || worker.headline?.toLowerCase().includes(profession) ||
         workerSkills.some(skill => (skill.profession + " " + (skill.skill || "")).toLowerCase().includes(profession));
-      const areaMatch = !area || profile?.area?.toLowerCase().includes(area);
+      const areaMatch = !area || profile.area?.toLowerCase().includes(area);
       return professionMatch && areaMatch;
     });
-    status.textContent = matches.length
-      ? matches.map(worker => {
-          const profile = profiles.get(worker.user_id) || {};
-          const list = (skills.get(worker.user_id) || []).map(skill => skill.profession).join(", ");
-          return (profile.display_name || "EnziLink কর্মী") + " · " + (profile.area || "এলাকা উল্লেখ নেই") +
-            " · " + (worker.headline || list || "দক্ষ কর্মী") +
-            (worker.years_experience != null ? " · অভিজ্ঞতা: " + worker.years_experience + " বছর" : "");
-        }).join("\\n")
-      : "আপনার অনুসন্ধানের সঙ্গে মেলে এমন প্রকাশিত কর্মী পাওয়া যায়নি।";
+    if (!matches.length) {
+      status.textContent = "আপনার অনুসন্ধানের সঙ্গে মেলে এমন প্রকাশিত কর্মী পাওয়া যায়নি।";
+      return;
+    }
+    status.textContent = matches.length + " জন প্রকাশিত কর্মী পাওয়া গেছে।";
+    renderWorkerCards(matches, profiles, skills);
   } catch (error) {
     status.textContent = "কর্মী তালিকা লোড হয়নি: " + (error.message || "Unknown error");
   }
