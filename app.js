@@ -220,6 +220,7 @@ el("worker-profile-form").addEventListener("submit", async event => {
     if (!name || !area || !headline || !phone || !skills.length) throw new Error("নাম, এলাকা, পেশা, ফোন ও দক্ষতা পূরণ করুন।");
     if (normalizePhone(phone).replace(/\D/g, "").length < 7) throw new Error("সঠিক ফোন নম্বর লিখুন।");
     if (whatsapp && normalizePhone(whatsapp).replace(/\D/g, "").length < 7) throw new Error("সঠিক WhatsApp নম্বর লিখুন।");
+    if (published && !el("profile-adult").checked) throw new Error("প্রোফাইল প্রকাশ করতে হলে নিশ্চিত করুন আপনার বয়স ১৮ বছর বা তার বেশি।");
     if (published && !el("profile-consent").checked) throw new Error("প্রোফাইল প্রকাশের আগে তথ্য প্রকাশের সম্মতি দিন।");
     const photo = el("profile-photo").files?.[0]; let photoUrl = currentPhotoUrl;
     if (photo) {
