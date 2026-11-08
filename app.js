@@ -208,6 +208,3 @@ window.addEventListener("load", () => {
   }
   showSession().catch(error => { status.textContent = error.message; });
 });
-db.auth.onAuthStateChange(() => {
-  showSession().catch(error => { status.textContent = error.message; });
-});
