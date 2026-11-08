@@ -155,6 +155,12 @@ form.addEventListener("submit", async event => {
 
 let selectedWorkerId = null;
 
+function normalizePhoneForTel(value) {
+  const bengaliDigits = "০১২৩৪৫৬৭৮৯";
+  const ascii = String(value || "").replace(/[০-৯]/g, digit => String(bengaliDigits.indexOf(digit)));
+  return ascii.replace(/[^0-9+*#,;]/g, "");
+}
+
 function renderWorkerCards(workers, profiles, skills) {
   const container = el("worker-results");
   container.replaceChildren();
@@ -181,12 +187,28 @@ function renderWorkerCards(workers, profiles, skills) {
     const verified = document.createElement("span");
     verified.className = "worker-verification";
     verified.textContent = worker.verification_status === "verified" ? "✓ যাচাইকৃত" : "যাচাই হয়নি";
+    const phone = String(worker.contact_phone || "").trim();
+    const telNumber = normalizePhoneForTel(phone);
+    if (telNumber) {
+      const call = document.createElement("a");
+      call.className = "primary worker-call";
+      call.href = "tel:" + telNumber;
+      call.textContent = "☎ কল করুন · " + phone;
+      call.setAttribute("aria-label", name.textContent + " কে ফোন করুন");
+      card.append(call);
+    } else {
+      const noPhone = document.createElement("span");
+      noPhone.className = "worker-no-phone";
+      noPhone.textContent = "ফোন নম্বর যোগ করা হয়নি";
+      card.append(noPhone);
+    }
     const contact = document.createElement("button");
     contact.type = "button";
-    contact.className = "primary worker-contact";
+    contact.className = "outline worker-contact";
     contact.textContent = "বার্তা পাঠান";
     contact.addEventListener("click", () => openWorkerContact(worker.user_id, name.textContent, headline.textContent));
-    card.append(name, headline, meta, bio, skillLine, verified, contact);
+    card.append(name, headline, meta, bio, skillLine, verified);
+    card.append(contact);
     container.append(card);
   });
 }
@@ -248,7 +270,7 @@ async function searchWorkers() {
   el("worker-results").replaceChildren();
   try {
     const { data: workers, error } = await db.from("el_worker_profiles")
-      .select("user_id,headline,bio,years_experience,is_published,verification_status")
+      .select("user_id,headline,bio,years_experience,is_published,verification_status,contact_phone")
       .eq("is_published", true).limit(100);
     if (error) throw error;
     const ids = (workers || []).map(worker => worker.user_id);
@@ -350,7 +372,7 @@ el("profile-open").addEventListener("click", async () => {
       throw new Error("এই অ্যাকাউন্টে কর্মী প্রোফাইল তৈরি করা যাবে না।");
     }
     const { data: worker, error: wError } = await db.from("el_worker_profiles")
-      .select("headline,bio,years_experience,is_published").eq("user_id", user.id).maybeSingle();
+      .select("headline,bio,years_experience,is_published,contact_phone").eq("user_id", user.id).maybeSingle();
     if (wError) throw wError;
     const { data: skills, error: sError } = await db.from("el_worker_skills")
       .select("profession,skill").eq("worker_id", user.id);
@@ -358,6 +380,7 @@ el("profile-open").addEventListener("click", async () => {
     el("profile-name").value = profile.display_name || user.user_metadata?.display_name || "";
     el("profile-area").value = profile.area || "";
     el("profile-headline").value = worker?.headline || "";
+    el("profile-phone").value = worker?.contact_phone || "";
     el("profile-experience").value = worker?.years_experience ?? "";
     el("profile-skills").value = (skills || []).map(x => x.skill ? x.profession + ": " + x.skill : x.profession).join(", ");
     el("profile-bio").value = worker?.bio || "";
@@ -379,7 +402,10 @@ el("worker-profile-form").addEventListener("submit", async event => {
     const name = el("profile-name").value.trim();
     const area = el("profile-area").value.trim();
     const headline = el("profile-headline").value.trim();
+    const phone = el("profile-phone").value.trim();
     const experience = Number(el("profile-experience").value);
+    if (phone.length < 7 || phone.length > 25) throw new Error("সঠিক ফোন নম্বর লিখুন (৭–২৫ অক্ষর)।");
+    if (!normalizePhoneForTel(phone)) throw new Error("ফোন নম্বরে অন্তত একটি সংখ্যা থাকতে হবে।");
     const bio = el("profile-bio").value.trim();
     const published = el("profile-publish").checked;
     const skillItems = el("profile-skills").value.split(",").map(s => s.trim()).filter(Boolean);
@@ -389,7 +415,7 @@ el("worker-profile-form").addEventListener("submit", async event => {
     if (pError) throw pError;
     const { error: wError } = await db.from("el_worker_profiles").upsert({
       user_id: user.id, headline, bio, years_experience: experience,
-      is_published: published, updated_at: new Date().toISOString()
+      contact_phone: phone, is_published: published, updated_at: new Date().toISOString()
     }, { onConflict: "user_id" });
     if (wError) throw wError;
     const { error: dError } = await db.from("el_worker_skills").delete().eq("worker_id", user.id);
