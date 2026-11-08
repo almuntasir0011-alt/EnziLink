@@ -189,26 +189,24 @@ function renderWorkerCards(workers, profiles, skills) {
     verified.textContent = worker.verification_status === "verified" ? "✓ যাচাইকৃত" : "যাচাই হয়নি";
     const phone = String(worker.contact_phone || "").trim();
     const telNumber = normalizePhoneForTel(phone);
+    let callElement;
     if (telNumber) {
-      const call = document.createElement("a");
-      call.className = "primary worker-call";
-      call.href = "tel:" + telNumber;
-      call.textContent = "☎ কল করুন · " + phone;
-      call.setAttribute("aria-label", name.textContent + " কে ফোন করুন");
-      card.append(call);
+      callElement = document.createElement("a");
+      callElement.className = "primary worker-call";
+      callElement.href = "tel:" + telNumber;
+      callElement.textContent = "☎ কল করুন · " + phone;
+      callElement.setAttribute("aria-label", name.textContent + " কে ফোন করুন");
     } else {
-      const noPhone = document.createElement("span");
-      noPhone.className = "worker-no-phone";
-      noPhone.textContent = "ফোন নম্বর যোগ করা হয়নি";
-      card.append(noPhone);
+      callElement = document.createElement("span");
+      callElement.className = "worker-no-phone";
+      callElement.textContent = "ফোন নম্বর যোগ করা হয়নি";
     }
     const contact = document.createElement("button");
     contact.type = "button";
     contact.className = "outline worker-contact";
     contact.textContent = "বার্তা পাঠান";
     contact.addEventListener("click", () => openWorkerContact(worker.user_id, name.textContent, headline.textContent));
-    card.append(name, headline, meta, bio, skillLine, verified);
-    card.append(contact);
+    card.append(name, headline, meta, bio, skillLine, verified, callElement, contact);
     container.append(card);
   });
 }
