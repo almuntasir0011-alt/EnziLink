@@ -12,7 +12,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>EnziLink — Connect Skills. Create Opportunities.</title>
-<link rel="stylesheet" href="styles.css?v=worker-directory-1">
+<link rel="stylesheet" href="styles.css?v=worker-directory-2">
 </head>
 <body>
 <header><a class="brand" href="#"><b>E</b> Enzi<span>Link</span></a><nav><a href="#find">কর্মী খুঁজুন</a><a href="#how">কীভাবে কাজ করে</a><a href="#categories">পেশাসমূহ</a><a href="#ecosystem">EnziVolt</a></nav><div class="header-actions"><button id="install-app" class="ghost install-button" hidden>অ্যাপ ইনস্টল</button><button id="profile-open" class="ghost" type="button">আমার প্রোফাইল</button><button data-open="login" class="ghost">লগইন</button><button data-open="join">যুক্ত হোন</button></div></header>
@@ -40,11 +40,12 @@
 <button id="account-submit" class="primary">চালিয়ে যান</button>
 <button id="resend-confirmation" class="outline" type="button" hidden>নিশ্চিতকরণ ইমেইল আবার পাঠান</button>
 </form><p id="message" aria-live="polite"></p></dialog>
-<dialog id="profile-dialog"><button id="profile-close" class="close" type="button">×</button><small>কর্মী অ্যাকাউন্ট</small><h2>কর্মী প্রোফাইল তৈরি</h2><p>প্রোফাইলে প্রকাশ করার আগে তথ্য যাচাই করে নিন। ফোন নম্বর বা ব্যক্তিগত ঠিকানা এখানে দেবেন না।</p>
+<dialog id="profile-dialog"><button id="profile-close" class="close" type="button">×</button><small>কর্মী অ্যাকাউন্ট</small><h2>কর্মী প্রোফাইল তৈরি</h2><p>প্রোফাইল প্রকাশ করলে আপনার ফোন নম্বরও গ্রাহকদের কাছে দৃশ্যমান হবে। ব্যক্তিগত নম্বরের বদলে কাজের জন্য নির্ধারিত নম্বর ব্যবহার করুন।</p>
 <form id="worker-profile-form">
 <label>আপনার নাম<input id="profile-name" maxlength="100" required></label>
 <label>কাজের এলাকা<input id="profile-area" maxlength="120" placeholder="যেমন: ঢাকা, দিনাজপুর" required></label>
 <label>পেশাগত পরিচিতি<input id="profile-headline" maxlength="160" placeholder="যেমন: Electrical Technician" required></label>
+<label>যোগাযোগের ফোন নম্বর<input id="profile-phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="25" placeholder="যেমন: +8801XXXXXXXXX" required></label>
 <label>অভিজ্ঞতা (বছর)<input id="profile-experience" type="number" min="0" max="80" step="1" required></label>
 <label>দক্ষতা (কমা দিয়ে আলাদা করুন)<input id="profile-skills" maxlength="1000" placeholder="Wiring, CCTV, DB installation" required></label>
 <label>নিজের পরিচিতি<textarea id="profile-bio" maxlength="1500" rows="4" placeholder="আপনার কাজের অভিজ্ঞতা ও দক্ষতা লিখুন"></textarea></label>
