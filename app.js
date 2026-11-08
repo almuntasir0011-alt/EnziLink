@@ -226,6 +226,8 @@ el("profile-delete").addEventListener("click", async () => {
     if (workerError) throw workerError;
     const { error: skillsError } = await db.from("el_worker_skills").delete().eq("worker_id", user.id);
     if (skillsError) throw skillsError;
+    const { error: privateError } = await db.from("el_worker_private").delete().eq("user_id", user.id);
+    if (privateError) throw privateError;
     await db.storage.from("worker-photos").remove([
       user.id + "/profile.jpg", user.id + "/profile.png", user.id + "/profile.webp"
     ]);
