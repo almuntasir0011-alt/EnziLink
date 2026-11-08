@@ -24,6 +24,24 @@ function openAccount(nextMode) {
 document.querySelectorAll("[data-account]").forEach(button => button.addEventListener("click", () => openAccount(button.dataset.account)));
 el("account-close").addEventListener("click", () => el("account-dialog").close());
 
+el("password-toggle").addEventListener("click", () => {
+  const input = el("account-password");
+  const showing = input.type === "text";
+  input.type = showing ? "password" : "text";
+  el("password-toggle").textContent = showing ? "দেখান" : "লুকান";
+  el("password-toggle").setAttribute("aria-label", showing ? "পাসওয়ার্ড দেখান" : "পাসওয়ার্ড লুকান");
+  el("password-toggle").setAttribute("aria-pressed", String(!showing));
+});
+
+function friendlyAuthError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  if (message.includes("invalid login credentials")) return "ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। আবার পরীক্ষা করে লিখুন।";
+  if (message.includes("email not confirmed")) return "আপনার ইমেইল এখনো নিশ্চিত করা হয়নি। Inbox/Spam থেকে নিশ্চিত করুন।";
+  if (message.includes("too many requests")) return "অনেকবার চেষ্টা করা হয়েছে। কিছুক্ষণ পরে আবার চেষ্টা করুন।";
+  if (message.includes("network") || message.includes("fetch")) return "ইন্টারনেট সংযোগ বা সার্ভারে সমস্যা হয়েছে। সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।";
+  return error?.message || "লগইন করা যায়নি। আবার চেষ্টা করুন।";
+}
+
 el("resend-confirmation").addEventListener("click", async () => {
   const email = el("account-email").value.trim();
   if (!email) { say("আগে নিবন্ধিত ইমেইল ঠিকানাটি লিখুন।"); return; }
@@ -77,7 +95,7 @@ el("account-form").addEventListener("submit", async event => {
         say("অ্যাকাউন্ট তৈরি হয়েছে।");
       } else say("অ্যাকাউন্ট তৈরি হয়েছে। ইমেইল নিশ্চিত করে লগইন করুন। Inbox ও Spam দেখুন।");
     }
-  } catch (error) { say(error.message || "অনুরোধটি সম্পন্ন করা যায়নি।"); }
+  } catch (error) { say(mode === "login" ? friendlyAuthError(error) : (error.message || "অনুরোধটি সম্পন্ন করা যায়নি।")); }
   finally { button.disabled = false; }
 });
 
