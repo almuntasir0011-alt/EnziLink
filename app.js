@@ -6,6 +6,7 @@ const say = value => { el("message").textContent = value; };
 const profileSay = value => { el("profile-message").textContent = value; };
 let mode = "login";
 let currentPhotoUrl = "";
+let currentUserId = null;
 
 function openAccount(nextMode) {
   mode = nextMode;
@@ -47,6 +48,7 @@ async function ensureWorkerRole() {
 }
 async function refreshSession() {
   const { data: { user } } = await db.auth.getUser();
+  currentUserId = user?.id || null;
   el("session-note").textContent = user ? "লগইন করা আছে: " + (user.email || "EnziLink account") : "কর্মী প্রোফাইল তৈরি করতে লগইন করুন। গ্রাহকদের লগইন ছাড়াই কর্মী খোঁজা যাবে।";
 }
 el("account-form").addEventListener("submit", async event => {
@@ -58,6 +60,7 @@ el("account-form").addEventListener("submit", async event => {
       const { error } = await db.auth.signInWithPassword({ email: el("account-email").value.trim(), password: el("account-password").value });
       if (error) throw error;
       await refreshSession();
+      await searchWorkers();
       say("লগইন সফল হয়েছে।");
       setTimeout(() => el("account-dialog").close(), 500);
     } else {
@@ -125,6 +128,12 @@ function renderWorkerCards(workers, profiles, skills) {
     skillsLine.className = "worker-skills";
     skillsLine.textContent = "দক্ষতা: " + (workerSkills.map(s => s.skill || s.profession).filter(Boolean).join(", ") || worker.headline || "তথ্য যোগ করা হয়নি");
     card.append(avatar, name, headline, details, skillsLine);
+    if (currentUserId && currentUserId === worker.user_id) {
+      const edit = document.createElement("button");
+      edit.type = "button"; edit.className = "outline worker-contact"; edit.textContent = "Edit Profile";
+      edit.addEventListener("click", () => window.openEnziLinkProfile());
+      card.append(edit);
+    }
     const phone = normalizePhone(worker.contact_phone);
     if (phone) {
       const call = document.createElement("a");
@@ -195,9 +204,35 @@ window.openEnziLinkProfile = async () => {
     el("profile-publish").checked = !!worker?.is_published;
     currentPhotoUrl = worker?.photo_url || "";
     el("photo-preview").src = currentPhotoUrl; el("photo-preview").hidden = !currentPhotoUrl;
-    profileSay(worker ? "আপনার আগের প্রোফাইল লোড হয়েছে। প্রয়োজনমতো পরিবর্তন করে সংরক্ষণ করুন।" : "এই অ্যাকাউন্টে এখনো প্রোফাইল নেই। তথ্য পূরণ করে প্রকাশ করতে পারবেন।");
+     el("profile-dialog").querySelector("h2").textContent = worker ? "Edit Employee Profile" : "Create Employee Profile";
+    el("profile-save").textContent = worker ? "Update Profile" : "Save Profile";
+    el("profile-delete").hidden = !worker;
+    profileSay(worker ? "Your existing profile has been loaded. Edit the details and save your changes." : "No worker profile exists for this account yet.");
   } catch (error) { profileSay(error.message || "প্রোফাইল লোড করা যায়নি।"); }
 };
+
+el("profile-delete").addEventListener("click", async () => {
+  if (!window.confirm("Delete your worker profile? Your login account will remain, but your public worker listing and skills will be removed.")) return;
+  const button = el("profile-delete"); button.disabled = true;
+  try {
+    const { data: { user }, error: authError } = await db.auth.getUser();
+    if (authError || !user) throw new Error("Please log in again.");
+    const { error: skillsError } = await db.from("el_worker_skills").delete().eq("worker_id", user.id);
+    if (skillsError) throw skillsError;
+    const { error: workerError } = await db.from("el_worker_profiles").delete().eq("user_id", user.id);
+    if (workerError) throw workerError;
+    await db.storage.from("worker-photos").remove([
+      user.id + "/profile.jpg", user.id + "/profile.png", user.id + "/profile.webp"
+    ]);
+    currentPhotoUrl = "";
+    el("profile-dialog").close();
+    await searchWorkers();
+    profileSay("Your worker profile has been deleted. Your EnziLink login account is still active.");
+  } catch (error) {
+    profileSay(error.message || "The worker profile could not be deleted.");
+  } finally { button.disabled = false; }
+});
+
 el("profile-photo").addEventListener("change", () => {
   const file = el("profile-photo").files?.[0]; if (!file) return;
   if (!["image/jpeg","image/png","image/webp"].includes(file.type) || file.size > 3 * 1024 * 1024) {
@@ -249,4 +284,4 @@ el("worker-profile-form").addEventListener("submit", async event => {
   finally { button.disabled = false; }
 });
 el("year").textContent = new Date().getFullYear();
-window.addEventListener("load", () => { refreshSession().catch(() => {}); searchWorkers(); });
+window.addEventListener("load", async () => { try { await refreshSession(); } catch (_) {} await searchWorkers(); });
