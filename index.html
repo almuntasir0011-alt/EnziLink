@@ -25,5 +25,19 @@
 <section class="ecosystem section" id="ecosystem"><small>আমাদের প্ল্যাটফর্ম</small><h2>Explore the EnziVolt Ecosystem</h2><p>EnziLink ও EnziVolt—দুটি স্বতন্ত্র প্ল্যাটফর্ম, একই পরিবারের অংশ।</p><div class="ecosystem-card"><div class="eco-mark">⚡</div><div class="eco-copy"><h3>EnziVolt</h3><p>Electrical Installation & Maintenance · CCTV & Security · Solar Solutions · Motor Control</p><a class="primary" href="https://enzivolt.netlify.app/" target="_blank" rel="noopener noreferrer">EnziVolt ওয়েবসাইট দেখুন ↗</a> <a class="primary" href="https://enzivolt.netlify.app/customer/" target="_blank" rel="noopener noreferrer">EnziVolt Customer Portal ↗</a></div><span class="eco-label">A brand under EnziVolt</span></div></section>
 <section class="banner"><div><small>আপনার দক্ষতাই আপনার পরিচয়</small><h2>আপনি কি একজন দক্ষ কর্মী?</h2><p>নিজের প্রোফাইল তৈরি করুন এবং কাজের সুযোগ খুঁজুন।</p></div><button data-open="join" class="white">কর্মী হিসেবে যুক্ত হোন ↗</button></section>
 </main><footer><a class="brand" href="#"><b>E</b> Enzi<span>Link</span></a><p>Connect Skills. Create Opportunities.</p><small>© <span id="year"></span> EnziLink · A brand under EnziVolt</small></footer>
-<dialog id="modal"><button id="close" class="close">×</button><small>EnziLink প্রাথমিক ডেমো</small><h2 id="modal-title">শুরু করুন</h2><p id="modal-copy">এই ফিচারটি পরবর্তী ধাপে নিরাপদ অ্যাকাউন্ট ব্যবস্থার সঙ্গে যুক্ত হবে।</p><form id="demo"><label>আপনার নাম<input required placeholder="নাম লিখুন"></label><label>আপনি কী করতে চান?<select><option>গ্রাহক হিসেবে কাজ খুঁজব</option><option>কর্মী হিসেবে কাজ খুঁজব</option></select></label><button class="primary">ডেমো অনুরোধ</button></form><p id="message"></p></dialog><script src="app.js"></script>
+<dialog id="modal"><button id="close" class="close" type="button">×</button><small>EnziLink অ্যাকাউন্ট</small><h2 id="modal-title">শুরু করুন</h2><p id="modal-copy">নিরাপদভাবে লগইন বা অ্যাকাউন্ট তৈরি করুন।</p>
+<form id="account-form">
+<label id="name-field">আপনার নাম<input id="account-name" autocomplete="name" maxlength="100"></label>
+<label id="email-field">ইমেইল<input id="account-email" type="email" required autocomplete="email"></label>
+<label id="password-field">পাসওয়ার্ড<input id="account-password" type="password" required minlength="8" autocomplete="current-password"></label>
+<label id="role-field">আপনি কী করতে চান?<select id="account-role"><option value="customer">গ্রাহক হিসেবে কাজ খুঁজব</option><option value="worker">কর্মী হিসেবে কাজ করব</option></select></label>
+<div id="job-fields" hidden>
+<label>কাজের শিরোনাম<input id="job-title" maxlength="140"></label>
+<label>পেশা<input id="job-profession" maxlength="100" placeholder="যেমন Electrical Technician"></label>
+<label>এলাকা<input id="job-area" maxlength="120" placeholder="যেমন Dhaka"></label>
+<label>কাজের বিবরণ<textarea id="job-description" maxlength="3000" rows="4"></textarea></label>
+</div>
+<button id="account-submit" class="primary">চালিয়ে যান</button>
+</form><p id="message" aria-live="polite"></p></dialog>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="app.js"></script>
 </body></html>
