@@ -172,7 +172,7 @@ document.querySelectorAll("[data-cat]").forEach(button => button.addEventListene
   el("profession").value = button.dataset.cat; el("find").scrollIntoView({ behavior: "smooth" }); searchWorkers();
 }));
 
-el("profile-open").addEventListener("click", async () => {
+window.openEnziLinkProfile = async () => {
   el("profile-dialog").showModal(); profileSay("অ্যাকাউন্ট যাচাই করা হচ্ছে…");
   try {
     const { data: { user }, error: authError } = await db.auth.getUser();
@@ -197,7 +197,7 @@ el("profile-open").addEventListener("click", async () => {
     el("photo-preview").src = currentPhotoUrl; el("photo-preview").hidden = !currentPhotoUrl;
     profileSay(worker ? "আপনার আগের প্রোফাইল লোড হয়েছে। প্রয়োজনমতো পরিবর্তন করে সংরক্ষণ করুন।" : "এই অ্যাকাউন্টে এখনো প্রোফাইল নেই। তথ্য পূরণ করে প্রকাশ করতে পারবেন।");
   } catch (error) { profileSay(error.message || "প্রোফাইল লোড করা যায়নি।"); }
-});
+};
 el("profile-photo").addEventListener("change", () => {
   const file = el("profile-photo").files?.[0]; if (!file) return;
   if (!["image/jpeg","image/png","image/webp"].includes(file.type) || file.size > 3 * 1024 * 1024) {
