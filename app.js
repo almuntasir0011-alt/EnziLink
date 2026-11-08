@@ -239,15 +239,20 @@ window.addEventListener("load", () => {
 const profileDialog = el("profile-dialog");
 const profileMessage = el("profile-message");
 el("profile-open").addEventListener("click", async () => {
-  const { data: { user }, error } = await db.auth.getUser();
-  if (error || !user) {
-    profileMessage.textContent = "প্রোফাইল তৈরি করতে আগে লগইন করুন।";
-    openModal("login");
-    return;
-  }
-  profileMessage.textContent = "প্রোফাইলের তথ্য লোড হচ্ছে…";
+  // Open the dialog immediately so a slow auth/network check cannot make the
+  // profile button appear unresponsive.
   profileDialog.showModal();
+  profileMessage.textContent = "অ্যাকাউন্ট যাচাই করা হচ্ছে…";
   try {
+    const { data: { user }, error } = await db.auth.getUser();
+    if (error) throw error;
+    if (!user) {
+      profileDialog.close();
+      openModal("login");
+      say("প্রোফাইল তৈরি করতে আগে লগইন করুন।");
+      return;
+    }
+    profileMessage.textContent = "প্রোফাইলের তথ্য লোড হচ্ছে…";
     const { data: profile, error: pError } = await db.from("el_profiles")
       .select("display_name,role,area").eq("id", user.id).single();
     if (pError) throw pError;
