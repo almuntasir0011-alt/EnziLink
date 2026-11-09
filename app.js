@@ -116,7 +116,7 @@ function workerEmoji(headline) {
   if (/mason|রাজমিস্ত্রি/.test(value)) return "🧱";
   return "🧰";
 }
-function renderWorkerCards(workers, profiles, skills) {
+function renderWorkerCards(workers, profiles, skills, contacts = new Map()) {
   const container = el("worker-results");
   container.replaceChildren();
   workers.forEach(worker => {
@@ -142,6 +142,29 @@ function renderWorkerCards(workers, profiles, skills) {
     skillsLine.className = "worker-skills";
     skillsLine.textContent = "দক্ষতা: " + (workerSkills.map(s => s.skill || s.profession).filter(Boolean).join(", ") || worker.headline || "তথ্য যোগ করা হয়নি");
     card.append(avatar, name, headline, details, skillsLine);
+    const contact = contacts.get(worker.user_id) || {};
+    if (contact.phone) {
+      const call = document.createElement("a");
+      call.className = "primary worker-call";
+      call.href = "tel:" + normalizePhone(contact.phone);
+      call.textContent = "Call " + contact.phone;
+      card.append(call);
+    }
+    if (contact.whatsapp_phone) {
+      const whatsapp = document.createElement("a");
+      whatsapp.className = "outline worker-call";
+      whatsapp.href = whatsappUrl(contact.whatsapp_phone);
+      whatsapp.target = "_blank";
+      whatsapp.rel = "noopener noreferrer";
+      whatsapp.textContent = "WhatsApp " + contact.whatsapp_phone;
+      card.append(whatsapp);
+    }
+    if (!contact.phone && !contact.whatsapp_phone) {
+      const note = document.createElement("p");
+      note.className = "worker-no-phone";
+      note.textContent = "Direct contact details are not available yet.";
+      card.append(note);
+    }
     if (currentUserId && currentUserId === worker.user_id) {
       const edit = document.createElement("button");
       edit.type = "button"; edit.className = "outline worker-contact"; edit.textContent = "Edit Profile";
@@ -242,14 +265,17 @@ async function searchWorkers() {
       await renderOwnPrivateProfile([]);
       return;
     }
-    const [p, s] = await Promise.all([
+    const [p, s, c] = await Promise.all([
       db.from("el_profiles").select("id,display_name,area,country").in("id", ids),
-      db.from("el_worker_skills").select("worker_id,profession,skill").in("worker_id", ids)
+      db.from("el_worker_skills").select("worker_id,profession,skill").in("worker_id", ids),
+      db.from("el_worker_contacts").select("worker_id,phone,whatsapp_phone,contact_public_consent").in("worker_id", ids)
     ]);
-    if (p.error) throw p.error; if (s.error) throw s.error;
+    if (p.error) throw p.error; if (s.error) throw s.error; if (c.error) throw c.error;
     const profiles = new Map((p.data || []).map(x => [x.id, x]));
     const skills = new Map();
     (s.data || []).forEach(x => { if (!skills.has(x.worker_id)) skills.set(x.worker_id, []); skills.get(x.worker_id).push(x); });
+    // The database only returns public contact rows for published, consented, verified adults.
+    const contacts = new Map((c.data || []).filter(x => x.contact_public_consent).map(x => [x.worker_id, x]));
     const matches = workers.filter(w => {
       const profile = profiles.get(w.user_id) || {};
       const workerSkills = skills.get(w.user_id) || [];
@@ -260,7 +286,7 @@ async function searchWorkers() {
     if (!matches.length) el("status").textContent = "আপনার অনুসন্ধানে কোনো প্রকাশিত কর্মী পাওয়া যায়নি।";
     else {
       el("status").textContent = matches.length + " জন কর্মী পাওয়া গেছে।";
-      renderWorkerCards(matches, profiles, skills);
+      renderWorkerCards(matches, profiles, skills, contacts);
     }
     await renderOwnPrivateProfile(matches.map(w => w.user_id));
   } catch (error) { el("status").textContent = "কর্মী তালিকা লোড হয়নি: " + (error.message || "Unknown error"); }
@@ -297,6 +323,10 @@ window.openEnziLinkProfile = async () => {
       ? await db.from("el_worker_private").select("date_of_birth").eq("user_id", user.id).maybeSingle()
       : { data: null, error: null };
     if (privateError) throw privateError;
+    const { data: contactInfo, error: contactError } = isWorker
+      ? await db.from("el_worker_contacts").select("phone,whatsapp_phone,contact_public_consent").eq("worker_id", user.id).maybeSingle()
+      : { data: null, error: null };
+    if (contactError) throw contactError;
     el("profile-name").value = profile.display_name || user.user_metadata?.display_name || "";
     el("profile-area").value = profile.area || "";
     el("profile-country").value = profile.country || "Bangladesh";
@@ -305,6 +335,9 @@ window.openEnziLinkProfile = async () => {
     el("profile-headline").value = worker?.headline || "";
     el("profile-gender").value = worker?.gender || "";
     el("profile-skills").value = [...new Set((skills || []).map(x => x.skill).filter(Boolean))].join(", ");
+    el("profile-phone").value = contactInfo?.phone || "";
+    el("profile-whatsapp").value = contactInfo?.whatsapp_phone || "";
+    el("profile-contact-consent").checked = !!contactInfo?.contact_public_consent;
     if (isWorker) {
       el("profile-publish").checked = !!worker?.is_published;
       currentPhotoUrl = worker?.photo_url || "";
@@ -411,6 +444,12 @@ el("worker-profile-form").addEventListener("submit", async event => {
     const headline = headlineInput || professions.join(" · ");
     const skills = [...new Set(el("profile-skills").value.split(",").map(x => x.trim()).filter(Boolean))];
     const published = el("profile-publish").checked;
+    const phone = normalizePhone(el("profile-phone").value.trim());
+    const whatsappPhone = normalizePhone(el("profile-whatsapp").value.trim());
+    const contactConsent = el("profile-contact-consent").checked;
+    const validPhone = value => !value || (value.replace(/\D/g, "").length >= 7 && value.replace(/\D/g, "").length <= 15);
+    if (!validPhone(phone) || !validPhone(whatsappPhone)) throw new Error("Enter valid phone numbers with country code (7–15 digits).");
+    if ((phone || whatsappPhone) && !contactConsent) throw new Error("Please consent before saving numbers for possible public display.");
     if (!dob || !professions.length) throw new Error("Date of birth and at least one profession are required.");
     const adultCutoff = new Date(); adultCutoff.setHours(0,0,0,0); adultCutoff.setFullYear(adultCutoff.getFullYear()-18);
     const dobDate = new Date(dob + "T00:00:00");
@@ -437,6 +476,14 @@ el("worker-profile-form").addEventListener("submit", async event => {
       is_published: published, updated_at: new Date().toISOString()
     }, { onConflict: "user_id" });
     if (wError) throw wError;
+    const { error: contactSaveError } = await db.from("el_worker_contacts").upsert({
+      worker_id: user.id,
+      phone: phone || null,
+      whatsapp_phone: whatsappPhone || null,
+      contact_public_consent: contactConsent,
+      updated_at: new Date().toISOString()
+    }, { onConflict: "worker_id" });
+    if (contactSaveError) throw contactSaveError;
     const { error: dError } = await db.from("el_worker_skills").delete().eq("worker_id", user.id);
     if (dError) throw dError;
     const skillRows = [
@@ -446,7 +493,10 @@ el("worker-profile-form").addEventListener("submit", async event => {
     const { error: sError } = await db.from("el_worker_skills").insert(skillRows);
     if (sError) throw sError;
     currentPhotoUrl = photoUrl;
-    profileSay(published ? "আপনার প্রোফাইল প্রকাশিত হয়েছে। গ্রাহকরা এখন দেখতে পারবেন।" : "প্রোফাইল সংরক্ষিত হয়েছে, কিন্তু প্রকাশিত নয়।");
+    const verificationNote = accountProfile.role === "worker"
+      ? " ফোন ও WhatsApp নম্বর কেবল EnziLink-এর প্রাপ্তবয়স্ক পরিচয় যাচাই সম্পন্ন হলে গ্রাহকদের দেখানো হবে।"
+      : "";
+    profileSay((published ? "আপনার প্রোফাইল প্রকাশিত হয়েছে। গ্রাহকরা এখন দেখতে পারবেন।" : "প্রোফাইল সংরক্ষিত হয়েছে, কিন্তু প্রকাশিত নয়।") + verificationNote);
     el("profile-photo").value = ""; await searchWorkers();
   } catch (error) { profileSay(error.message || "প্রোফাইল সংরক্ষণ করা যায়নি।"); }
   finally { button.disabled = false; }
