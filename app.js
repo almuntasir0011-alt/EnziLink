@@ -61,7 +61,7 @@ async function ensureWorkerRole() {
     const { error: roleError } = await db.rpc("el_become_worker");
     if (roleError) throw roleError;
   }
-  const { error: workerError } = await db.from("el_worker_profiles").upsert({ user_id: user.id, is_published: false }, { onConflict: "user_id" });
+  const { error: workerError } = await db.from("el_worker_profiles").upsert({ user_id: user.id, is_published: false }, { onConflict: "user_id", ignoreDuplicates: true });
   if (workerError) throw workerError;
 }
 async function refreshSession() {
@@ -199,7 +199,7 @@ async function searchWorkers() {
   const area = el("area").value.trim().toLowerCase();
   el("status").textContent = "কর্মী খোঁজা হচ্ছে…"; el("worker-results").replaceChildren();
   try {
-    const { data: workers, error } = await db.from("el_worker_profiles").select("user_id,headline,is_published,contact_phone,gender,whatsapp_phone,photo_url").eq("is_published", true).limit(100);
+    const { data: workers, error } = await db.from("el_worker_profiles").select("user_id,headline,is_published,gender,photo_url").eq("is_published", true).limit(100);
     if (error) throw error;
     const ids = (workers || []).map(w => w.user_id);
     if (!ids.length) {
@@ -244,7 +244,7 @@ window.openEnziLinkProfile = async () => {
     const { data: profile, error: pError } = await db.from("el_profiles").select("display_name,role,area,country").eq("id", user.id).single();
     if (pError) throw pError;
     if (profile.role !== "worker") { const { error } = await db.rpc("el_become_worker"); if (error) throw error; }
-    const { data: worker, error: wError } = await db.from("el_worker_profiles").select("headline,is_published,contact_phone,gender,whatsapp_phone,photo_url").eq("user_id", user.id).maybeSingle();
+    const { data: worker, error: wError } = await db.from("el_worker_profiles").select("headline,is_published,gender,photo_url").eq("user_id", user.id).maybeSingle();
     if (wError) throw wError;
     const { data: skills, error: sError } = await db.from("el_worker_skills").select("profession,skill").eq("worker_id", user.id);
     if (sError) throw sError;
