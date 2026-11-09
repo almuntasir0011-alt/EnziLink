@@ -78,10 +78,8 @@ el("account-form").addEventListener("submit", async event => {
       const { error } = await db.auth.signInWithPassword({ email: el("account-email").value.trim(), password: el("account-password").value });
       if (error) throw error;
       const requestedRole = localStorage.getItem("enzilink_requested_role");
-      if (requestedRole === "worker") {
-        await ensureWorkerRole();
-        localStorage.removeItem("enzilink_requested_role");
-      }
+      if (requestedRole === "worker") await ensureWorkerRole();
+      if (requestedRole) localStorage.removeItem("enzilink_requested_role");
       await refreshSession();
       await searchWorkers();
       say("লগইন সফল হয়েছে।");
@@ -96,6 +94,7 @@ el("account-form").addEventListener("submit", async event => {
       localStorage.setItem("enzilink_requested_role", role);
       if (data.session) {
         if (role === "worker") await ensureWorkerRole();
+        localStorage.removeItem("enzilink_requested_role");
         await refreshSession();
         say("অ্যাকাউন্ট তৈরি হয়েছে।");
       } else say("অ্যাকাউন্ট তৈরি হয়েছে। ইমেইল নিশ্চিত করে লগইন করুন। Inbox ও Spam দেখুন।");
@@ -287,12 +286,22 @@ window.openEnziLinkProfile = async () => {
     if (!user) { el("profile-dialog").close(); openAccount("login"); say("কর্মী প্রোফাইল তৈরি বা সম্পাদনা করতে লগইন করুন।"); return; }
     const { data: profile, error: pError } = await db.from("el_profiles").select("display_name,role,area,country").eq("id", user.id).single();
     if (pError) throw pError;
-    if (profile.role !== "worker") { const { error } = await db.rpc("el_become_worker"); if (error) throw error; }
-    const { data: worker, error: wError } = await db.from("el_worker_profiles").select("headline,is_published,gender,photo_url").eq("user_id", user.id).maybeSingle();
+    const isWorker = profile.role === "worker";
+    el("worker-fields").hidden = !isWorker;
+    el("profile-description").textContent = isWorker
+      ? "আপনার কর্মী প্রোফাইল দেখুন, সম্পাদনা করুন এবং প্রকাশের অবস্থা নিয়ন্ত্রণ করুন।"
+      : "আপনার কাস্টমার প্রোফাইল শুধু আপনি দেখতে পারবেন। নিজের নাম ও এলাকা সম্পাদনা করে সংরক্ষণ করুন।";
+    const { data: worker, error: wError } = isWorker
+      ? await db.from("el_worker_profiles").select("headline,is_published,gender,photo_url").eq("user_id", user.id).maybeSingle()
+      : { data: null, error: null };
     if (wError) throw wError;
-    const { data: skills, error: sError } = await db.from("el_worker_skills").select("profession,skill").eq("worker_id", user.id);
+    const { data: skills, error: sError } = isWorker
+      ? await db.from("el_worker_skills").select("profession,skill").eq("worker_id", user.id)
+      : { data: [], error: null };
     if (sError) throw sError;
-    const { data: privateInfo, error: privateError } = await db.from("el_worker_private").select("date_of_birth").eq("user_id", user.id).maybeSingle();
+    const { data: privateInfo, error: privateError } = isWorker
+      ? await db.from("el_worker_private").select("date_of_birth").eq("user_id", user.id).maybeSingle()
+      : { data: null, error: null };
     if (privateError) throw privateError;
     el("profile-name").value = profile.display_name || user.user_metadata?.display_name || "";
     el("profile-area").value = profile.area || "";
@@ -302,13 +311,24 @@ window.openEnziLinkProfile = async () => {
     el("profile-headline").value = worker?.headline || "";
     el("profile-gender").value = worker?.gender || "";
     el("profile-skills").value = [...new Set((skills || []).map(x => x.skill).filter(Boolean))].join(", ");
-    el("profile-publish").checked = !!worker?.is_published;
-    currentPhotoUrl = worker?.photo_url || "";
-    el("photo-preview").src = currentPhotoUrl; el("photo-preview").hidden = !currentPhotoUrl;
-     el("profile-dialog").querySelector("h2").textContent = worker ? "Edit Employee Profile" : "Create Employee Profile";
-    el("profile-save").textContent = worker ? "Update Profile" : "Save Profile";
-    el("profile-delete").hidden = !worker;
-    profileSay(worker ? "Your existing profile has been loaded. Edit the details and save your changes." : "No worker profile exists for this account yet.");
+    if (isWorker) {
+      el("profile-publish").checked = !!worker?.is_published;
+      currentPhotoUrl = worker?.photo_url || "";
+      el("photo-preview").src = currentPhotoUrl; el("photo-preview").hidden = !currentPhotoUrl;
+    } else {
+      currentPhotoUrl = "";
+      el("photo-preview").hidden = true;
+    }
+    el("profile-dialog").querySelector("h2").textContent = isWorker
+      ? (worker ? "Edit Worker Profile" : "Create Worker Profile")
+      : "My Customer Profile";
+    el("profile-save").textContent = isWorker
+      ? (worker ? "Update Worker Profile" : "Save Worker Profile")
+      : "Save Customer Profile";
+    el("profile-delete").hidden = !isWorker || !worker;
+    profileSay(isWorker
+      ? (worker ? "Your worker profile is loaded. Edit and save your changes." : "Create your worker profile.")
+      : "Your customer profile is loaded. Edit your details and save.");
   } catch (error) { profileSay(error.message || "প্রোফাইল লোড করা যায়নি।"); }
 };
 
@@ -365,16 +385,29 @@ el("worker-profile-form").addEventListener("submit", async event => {
   try {
     const { data: { user }, error: authError } = await db.auth.getUser();
     if (authError || !user) throw new Error("আবার লগইন করুন।");
-    await ensureWorkerRole();
+    const { data: accountProfile, error: accountProfileError } = await db.from("el_profiles").select("role").eq("id", user.id).single();
+    if (accountProfileError) throw accountProfileError;
+    const isWorker = accountProfile.role === "worker";
     const name = el("profile-name").value.trim(), area = el("profile-area").value.trim();
     const country = el("profile-country").value.trim();
+    if (!name || !area || !country) throw new Error("Name, country and city/area are required.");
+    if (!isWorker) {
+      const { error: customerUpdateError } = await db.from("el_profiles").update({
+        display_name: name, area, country, updated_at: new Date().toISOString()
+      }).eq("id", user.id);
+      if (customerUpdateError) throw customerUpdateError;
+      profileSay("আপনার কাস্টমার প্রোফাইল সংরক্ষিত হয়েছে। এটি শুধু আপনি দেখতে পারবেন।");
+      await refreshSession();
+      return;
+    }
+    await ensureWorkerRole();
     const dob = el("profile-dob").value;
     const professions = [...new Set(el("profile-professions").value.split(",").map(x => x.trim()).filter(Boolean))];
     const headlineInput = el("profile-headline").value.trim();
     const headline = headlineInput || professions.join(" · ");
     const skills = [...new Set(el("profile-skills").value.split(",").map(x => x.trim()).filter(Boolean))];
     const published = el("profile-publish").checked;
-    if (!name || !area || !country || !dob || !professions.length) throw new Error("Name, country, city/area, date of birth and at least one profession are required.");
+    if (!dob || !professions.length) throw new Error("Date of birth and at least one profession are required.");
     const adultCutoff = new Date(); adultCutoff.setHours(0,0,0,0); adultCutoff.setFullYear(adultCutoff.getFullYear()-18);
     const dobDate = new Date(dob + "T00:00:00");
     if (Number.isNaN(dobDate.getTime()) || dobDate > adultCutoff) {
