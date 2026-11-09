@@ -171,26 +171,70 @@ async function renderOwnPrivateProfile(existingIds = []) {
   if (profileError) throw profileError;
   if (skillsError) throw skillsError;
   if (!worker || worker.is_published || !profile) return;
+
+  const savedSkills = skills || [];
+  const professions = [...new Set(savedSkills.map(x => x.profession).filter(Boolean))];
+  const skillNames = [...new Set(savedSkills.map(x => x.skill).filter(Boolean))];
   const card = document.createElement("article");
-  card.className = "worker-card";
+  card.className = "worker-card own-private-profile";
+
+  const top = document.createElement("div");
+  top.className = "worker-profile-top";
+  const avatar = document.createElement("div");
+  avatar.className = "worker-avatar";
+  if (worker.photo_url) {
+    const img = document.createElement("img");
+    img.src = worker.photo_url;
+    img.alt = "Your profile photo";
+    avatar.append(img);
+  } else {
+    avatar.textContent = workerEmoji(worker.headline || professions.join(" "));
+  }
+  const identity = document.createElement("div");
+  identity.className = "worker-profile-identity";
   const heading = document.createElement("h3");
   heading.textContent = profile.display_name || "Your worker profile";
   const status = document.createElement("p");
-  status.className = "worker-headline";
-  status.textContent = "Your profile · Private · Only visible to you";
+  status.className = "worker-private-status";
+  status.textContent = "PRIVATE PROFILE · Only visible to you";
+  identity.append(heading, status);
+  top.append(avatar, identity);
+
   const headline = document.createElement("p");
-  headline.className = "worker-meta";
-  headline.textContent = worker.headline || "Worker profile";
+  headline.className = "worker-headline";
+  headline.textContent = worker.headline || "Add a professional headline in Edit Profile";
+
   const details = document.createElement("p");
   details.className = "worker-meta";
-  details.textContent = [profile.area, profile.country].filter(Boolean).join(" · ");
+  details.textContent = [profile.area, profile.country].filter(Boolean).join(" · ") || "Add your work area and country";
+
+  const professionLine = document.createElement("p");
+  professionLine.className = "worker-skills";
+  professionLine.textContent = "Professions: " + (professions.join(", ") || "Add your professions in Edit Profile");
+
   const skillLine = document.createElement("p");
   skillLine.className = "worker-skills";
-  skillLine.textContent = "Professions / skills: " + (skills || []).map(x => x.skill || x.profession).filter(Boolean).join(", ");
+  skillLine.textContent = "Skills: " + (skillNames.join(", ") || "Add your skills in Edit Profile");
+
+  const completeness = [
+    !!profile.display_name, !!profile.area, !!profile.country,
+    !!worker.headline, !!worker.photo_url, professions.length > 0, skillNames.length > 0
+  ].filter(Boolean).length;
+  const progress = document.createElement("p");
+  progress.className = "worker-profile-completion";
+  progress.textContent = "Profile details added: " + completeness + " of 7";
+
+  const note = document.createElement("p");
+  note.className = "worker-meta";
+  note.textContent = "Your profile is not visible to customers while it is private. Public listing requires eligibility and your consent.";
+
   const edit = document.createElement("button");
-  edit.type = "button"; edit.className = "outline worker-contact"; edit.textContent = "Edit Profile";
+  edit.type = "button";
+  edit.className = "outline worker-contact";
+  edit.textContent = "Edit Profile";
   edit.addEventListener("click", () => window.openEnziLinkProfile());
-  card.append(heading, status, headline, details, skillLine, edit);
+
+  card.append(top, headline, details, professionLine, skillLine, progress, note, edit);
   el("worker-results").prepend(card);
 }
 
@@ -366,7 +410,7 @@ el("worker-profile-form").addEventListener("submit", async event => {
     if (sError) throw sError;
     currentPhotoUrl = photoUrl;
     profileSay(published ? "আপনার প্রোফাইল প্রকাশিত হয়েছে। গ্রাহকরা এখন দেখতে পারবেন।" : "প্রোফাইল সংরক্ষিত হয়েছে, কিন্তু প্রকাশিত নয়।");
-    el("profile-photo").value = ""; searchWorkers();
+    el("profile-photo").value = ""; await searchWorkers();
   } catch (error) { profileSay(error.message || "প্রোফাইল সংরক্ষণ করা যায়নি।"); }
   finally { button.disabled = false; }
 });
