@@ -77,6 +77,11 @@ el("account-form").addEventListener("submit", async event => {
     if (mode === "login") {
       const { error } = await db.auth.signInWithPassword({ email: el("account-email").value.trim(), password: el("account-password").value });
       if (error) throw error;
+      const requestedRole = localStorage.getItem("enzilink_requested_role");
+      if (requestedRole === "worker") {
+        await ensureWorkerRole();
+        localStorage.removeItem("enzilink_requested_role");
+      }
       await refreshSession();
       await searchWorkers();
       say("লগইন সফল হয়েছে।");
@@ -152,19 +157,43 @@ function renderWorkerCards(workers, profiles, skills) {
       edit.addEventListener("click", () => window.openEnziLinkProfile());
       card.append(edit);
     }
-    const phone = normalizePhone(worker.contact_phone);
-    if (phone) {
-      const call = document.createElement("a");
-      call.className = "primary worker-call"; call.href = "tel:" + phone; call.textContent = "☎ কল করুন"; card.append(call);
-    }
-    const wa = whatsappUrl(worker.whatsapp_phone || worker.contact_phone);
-    if (worker.whatsapp_phone && wa) {
-      const message = document.createElement("a");
-      message.className = "outline worker-whatsapp"; message.href = wa; message.target = "_blank"; message.rel = "noopener noreferrer"; message.textContent = "WhatsApp মেসেজ"; card.append(message);
-    }
     container.append(card);
   });
 }
+async function renderOwnPrivateProfile(existingIds = []) {
+  if (!currentUserId || existingIds.includes(currentUserId)) return;
+  const [{ data: worker, error: workerError }, { data: profile, error: profileError }, { data: skills, error: skillsError }] = await Promise.all([
+    db.from("el_worker_profiles").select("user_id,headline,photo_url,is_published").eq("user_id", currentUserId).maybeSingle(),
+    db.from("el_profiles").select("id,display_name,area,country").eq("id", currentUserId).maybeSingle(),
+    db.from("el_worker_skills").select("worker_id,profession,skill").eq("worker_id", currentUserId)
+  ]);
+  if (workerError) throw workerError;
+  if (profileError) throw profileError;
+  if (skillsError) throw skillsError;
+  if (!worker || worker.is_published || !profile) return;
+  const card = document.createElement("article");
+  card.className = "worker-card";
+  const heading = document.createElement("h3");
+  heading.textContent = profile.display_name || "Your worker profile";
+  const status = document.createElement("p");
+  status.className = "worker-headline";
+  status.textContent = "Your profile · Private · Only visible to you";
+  const headline = document.createElement("p");
+  headline.className = "worker-meta";
+  headline.textContent = worker.headline || "Worker profile";
+  const details = document.createElement("p");
+  details.className = "worker-meta";
+  details.textContent = [profile.area, profile.country].filter(Boolean).join(" · ");
+  const skillLine = document.createElement("p");
+  skillLine.className = "worker-skills";
+  skillLine.textContent = "Professions / skills: " + (skills || []).map(x => x.skill || x.profession).filter(Boolean).join(", ");
+  const edit = document.createElement("button");
+  edit.type = "button"; edit.className = "outline worker-contact"; edit.textContent = "Edit Profile";
+  edit.addEventListener("click", () => window.openEnziLinkProfile());
+  card.append(heading, status, headline, details, skillLine, edit);
+  el("worker-results").prepend(card);
+}
+
 async function searchWorkers() {
   const profession = el("profession").value.trim().toLowerCase();
   const area = el("area").value.trim().toLowerCase();
@@ -173,7 +202,11 @@ async function searchWorkers() {
     const { data: workers, error } = await db.from("el_worker_profiles").select("user_id,headline,is_published,contact_phone,gender,whatsapp_phone,photo_url").eq("is_published", true).limit(100);
     if (error) throw error;
     const ids = (workers || []).map(w => w.user_id);
-    if (!ids.length) { el("status").textContent = "এখনো কোনো প্রকাশিত কর্মী প্রোফাইল নেই।"; return; }
+    if (!ids.length) {
+      el("status").textContent = "এখনো কোনো প্রকাশিত কর্মী প্রোফাইল নেই।";
+      await renderOwnPrivateProfile([]);
+      return;
+    }
     const [p, s] = await Promise.all([
       db.from("el_profiles").select("id,display_name,area,country").in("id", ids),
       db.from("el_worker_skills").select("worker_id,profession,skill").in("worker_id", ids)
@@ -189,9 +222,12 @@ async function searchWorkers() {
       const areaMatch = !area || ((profile.area || "") + " " + (profile.country || "")).toLowerCase().includes(area);
       return professionMatch && areaMatch;
     });
-    if (!matches.length) { el("status").textContent = "আপনার অনুসন্ধানে কোনো কর্মী পাওয়া যায়নি।"; return; }
-    el("status").textContent = matches.length + " জন কর্মী পাওয়া গেছে।";
-    renderWorkerCards(matches, profiles, skills);
+    if (!matches.length) el("status").textContent = "আপনার অনুসন্ধানে কোনো প্রকাশিত কর্মী পাওয়া যায়নি।";
+    else {
+      el("status").textContent = matches.length + " জন কর্মী পাওয়া গেছে।";
+      renderWorkerCards(matches, profiles, skills);
+    }
+    await renderOwnPrivateProfile(matches.map(w => w.user_id));
   } catch (error) { el("status").textContent = "কর্মী তালিকা লোড হয়নি: " + (error.message || "Unknown error"); }
 }
 el("search-form").addEventListener("submit", event => { event.preventDefault(); searchWorkers(); });
@@ -287,24 +323,21 @@ el("worker-profile-form").addEventListener("submit", async event => {
   try {
     const { data: { user }, error: authError } = await db.auth.getUser();
     if (authError || !user) throw new Error("আবার লগইন করুন।");
+    await ensureWorkerRole();
     const name = el("profile-name").value.trim(), area = el("profile-area").value.trim();
     const country = el("profile-country").value.trim();
     const dob = el("profile-dob").value;
     const professions = [...new Set(el("profile-professions").value.split(",").map(x => x.trim()).filter(Boolean))];
     const headlineInput = el("profile-headline").value.trim();
     const headline = headlineInput || professions.join(" · ");
-    const phone = el("profile-phone").value.trim();
-    const whatsapp = el("profile-whatsapp").value.trim();
     const skills = [...new Set(el("profile-skills").value.split(",").map(x => x.trim()).filter(Boolean))];
     const published = el("profile-publish").checked;
-    if (!name || !area || !country || !dob || !professions.length || !phone) throw new Error("Name, country, city/area, date of birth, at least one profession and phone number are required.");
+    if (!name || !area || !country || !dob || !professions.length) throw new Error("Name, country, city/area, date of birth and at least one profession are required.");
     const adultCutoff = new Date(); adultCutoff.setHours(0,0,0,0); adultCutoff.setFullYear(adultCutoff.getFullYear()-18);
     const dobDate = new Date(dob + "T00:00:00");
     if (Number.isNaN(dobDate.getTime()) || dobDate > adultCutoff) {
       if (published) throw new Error("Public worker profiles are available only to adults aged 18 or older.");
     }
-    if (normalizePhone(phone).replace(/\D/g, "").length < 7) throw new Error("সঠিক ফোন নম্বর লিখুন।");
-    if (whatsapp && normalizePhone(whatsapp).replace(/\D/g, "").length < 7) throw new Error("সঠিক WhatsApp নম্বর লিখুন।");
     if (published && !el("profile-adult").checked) throw new Error("প্রোফাইল প্রকাশ করতে হলে নিশ্চিত করুন আপনার বয়স ১৮ বছর বা তার বেশি।");
     if (published && !el("profile-consent").checked) throw new Error("প্রোফাইল প্রকাশের আগে তথ্য প্রকাশের সম্মতি দিন।");
     const photo = el("profile-photo").files?.[0]; let photoUrl = currentPhotoUrl;
@@ -320,7 +353,7 @@ el("worker-profile-form").addEventListener("submit", async event => {
     const { error: pError } = await db.from("el_profiles").update({ display_name: name, area, country, updated_at: new Date().toISOString() }).eq("id", user.id);
     if (pError) throw pError;
     const { error: wError } = await db.from("el_worker_profiles").upsert({
-      user_id: user.id, headline, contact_phone: phone, whatsapp_phone: whatsapp || null,
+      user_id: user.id, headline, contact_phone: null, whatsapp_phone: null,
       gender: el("profile-gender").value || null, photo_url: photoUrl || null,
       is_published: published, updated_at: new Date().toISOString()
     }, { onConflict: "user_id" });
