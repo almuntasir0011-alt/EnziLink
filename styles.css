@@ -45,3 +45,14 @@ dialog .consent-line input{width:18px;height:18px;margin-top:2px;flex:0 0 auto}
 .worker-private-status{font-size:10px!important;letter-spacing:.5px;color:#e4c77b!important;font-weight:800}
 .worker-profile-completion{font-size:11px!important;color:#77d8e8!important;font-weight:700}
 .own-private-profile{border-color:#d9b85a66}
+
+/* EnziVolt cross-promotion strip */
+.brand-promo{max-width:1128px;margin:12px auto 0;padding:13px 18px;display:flex;align-items:center;justify-content:space-between;gap:16px;border:1px solid #d9b85a55;border-radius:14px;background:linear-gradient(100deg,#282414 0%,#17243a 65%,#132b3b 100%);box-shadow:0 10px 28px #0003}
+.brand-promo-copy{display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0}
+.brand-promo-name{font-weight:900;font-size:17px;letter-spacing:.2px;color:#f4cf72;white-space:nowrap}
+.brand-promo-line{font-size:13px;font-weight:800;color:#f4f7fc}
+.brand-promo-services{font-size:11px;color:#b9c8dc}
+.brand-promo-link{flex:0 0 auto;padding:9px 13px;border:1px solid #e7c96f88;border-radius:9px;color:#f6d77d;font-size:12px;font-weight:800;white-space:nowrap}
+.brand-promo-link:hover{background:#f0bd3d18}
+@media(max-width:800px){.brand-promo{margin:10px 16px 0}}
+@media(max-width:560px){.brand-promo{align-items:flex-start;padding:13px;gap:10px}.brand-promo-copy{display:grid;grid-template-columns:1fr;gap:4px}.brand-promo-name{font-size:16px}.brand-promo-line{font-size:12px}.brand-promo-services{font-size:10px;line-height:1.5}.brand-promo-link{padding:8px 10px;font-size:10px;align-self:center}}
