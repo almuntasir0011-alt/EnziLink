@@ -36,3 +36,12 @@ dialog .consent-line input{width:18px;height:18px;margin-top:2px;flex:0 0 auto}
 .password-field input{flex:1;width:0}
 .password-toggle{flex:0 0 auto;padding:0 13px;background:#203b5b;border:1px solid #49698f;color:#f4f7fc;border-radius:10px;font-size:12px}
 #message{color:#ffd18a;line-height:1.6;min-height:18px}
+
+
+/* Private profile presentation */
+.worker-profile-top{display:flex;align-items:center;gap:14px;margin-bottom:4px}
+.worker-profile-identity{min-width:0}
+.worker-profile-identity h3{margin:0 0 5px}
+.worker-private-status{font-size:10px!important;letter-spacing:.5px;color:#e4c77b!important;font-weight:800}
+.worker-profile-completion{font-size:11px!important;color:#77d8e8!important;font-weight:700}
+.own-private-profile{border-color:#d9b85a66}
