@@ -11,10 +11,9 @@ let currentUserId = null;
 function openAccount(nextMode) {
   mode = nextMode;
   el("modal-title").textContent = mode === "login" ? "লগইন" : "EnziLink-এ যুক্ত হোন";
-  el("modal-copy").textContent = mode === "login" ? "আপনার EnziLink অ্যাকাউন্টে প্রবেশ করুন।" : "কর্মী হিসেবে প্রোফাইল প্রকাশ করতে অথবা গ্রাহক হিসেবে অ্যাকাউন্ট তৈরি করতে পারেন।";
+  el("modal-copy").textContent = mode === "login" ? "আপনার EnziLink অ্যাকাউন্টে প্রবেশ করুন।" : "একটি অ্যাকাউন্ট তৈরি করুন। পরে একই অ্যাকাউন্টে গ্রাহক ও কর্মী—দুই সুবিধাই ব্যবহার করতে পারবেন।";
   el("account-submit").textContent = mode === "login" ? "লগইন করুন" : "অ্যাকাউন্ট তৈরি করুন";
   el("name-field").hidden = mode !== "join";
-  el("role-field").hidden = mode !== "join";
   el("resend-confirmation").hidden = mode !== "login";
   el("account-name").required = mode === "join";
   el("account-form").reset();
@@ -77,24 +76,17 @@ el("account-form").addEventListener("submit", async event => {
     if (mode === "login") {
       const { error } = await db.auth.signInWithPassword({ email: el("account-email").value.trim(), password: el("account-password").value });
       if (error) throw error;
-      const requestedRole = localStorage.getItem("enzilink_requested_role");
-      if (requestedRole === "worker") await ensureWorkerRole();
-      if (requestedRole) localStorage.removeItem("enzilink_requested_role");
       await refreshSession();
       await searchWorkers();
       say("লগইন সফল হয়েছে।");
       setTimeout(() => el("account-dialog").close(), 500);
     } else {
-      const role = el("account-role").value;
       const { data, error } = await db.auth.signUp({
         email: el("account-email").value.trim(), password: el("account-password").value,
         options: { data: { display_name: el("account-name").value.trim() }, emailRedirectTo: "https://almuntasir0011-alt.github.io/EnziLink/" }
       });
       if (error) throw error;
-      localStorage.setItem("enzilink_requested_role", role);
       if (data.session) {
-        if (role === "worker") await ensureWorkerRole();
-        localStorage.removeItem("enzilink_requested_role");
         await refreshSession();
         say("অ্যাকাউন্ট তৈরি হয়েছে।");
       } else say("অ্যাকাউন্ট তৈরি হয়েছে। ইমেইল নিশ্চিত করে লগইন করুন। Inbox ও Spam দেখুন।");
@@ -288,6 +280,8 @@ window.openEnziLinkProfile = async () => {
     if (pError) throw pError;
     const isWorker = profile.role === "worker";
     el("worker-fields").hidden = !isWorker;
+    el("become-worker").hidden = isWorker;
+    ["profile-dob","profile-professions"].forEach(id => { el(id).required = isWorker; });
     el("profile-description").textContent = isWorker
       ? "আপনার কর্মী প্রোফাইল দেখুন, সম্পাদনা করুন এবং প্রকাশের অবস্থা নিয়ন্ত্রণ করুন।"
       : "আপনার কাস্টমার প্রোফাইল শুধু আপনি দেখতে পারবেন। নিজের নাম ও এলাকা সম্পাদনা করে সংরক্ষণ করুন।";
@@ -323,14 +317,24 @@ window.openEnziLinkProfile = async () => {
       ? (worker ? "Edit Worker Profile" : "Create Worker Profile")
       : "My Customer Profile";
     el("profile-save").textContent = isWorker
-      ? (worker ? "Update Worker Profile" : "Save Worker Profile")
+      ? (worker ? "Update Profile" : "Save Worker Profile")
       : "Save Customer Profile";
     el("profile-delete").hidden = !isWorker || !worker;
     profileSay(isWorker
-      ? (worker ? "Your worker profile is loaded. Edit and save your changes." : "Create your worker profile.")
-      : "Your customer profile is loaded. Edit your details and save.");
+      ? (worker ? "আপনার প্রোফাইল লোড হয়েছে। প্রয়োজন হলে তথ্য সম্পাদনা করুন।" : "কর্মী হিসেবে কাজ করতে নিচের তথ্য পূরণ করুন।")
+      : "আপনার প্রোফাইল লোড হয়েছে। চাইলে পরে কর্মী প্রোফাইলও যোগ করতে পারবেন।");
   } catch (error) { profileSay(error.message || "প্রোফাইল লোড করা যায়নি।"); }
 };
+
+el("become-worker").addEventListener("click", async () => {
+  const button = el("become-worker"); button.disabled = true;
+  try {
+    await ensureWorkerRole();
+    await window.openEnziLinkProfile();
+  } catch (error) {
+    profileSay(error.message || "কর্মী প্রোফাইল চালু করা যায়নি।");
+  } finally { button.disabled = false; }
+});
 
 el("profile-delete").addEventListener("click", async () => {
   if (!window.confirm("Delete your worker profile? Your login account will remain, but your public worker listing and skills will be removed.")) return;
