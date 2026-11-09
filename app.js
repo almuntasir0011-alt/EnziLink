@@ -256,8 +256,6 @@ window.openEnziLinkProfile = async () => {
     el("profile-dob").value = privateInfo?.date_of_birth || "";
     el("profile-professions").value = [...new Set((skills || []).map(x => x.profession).filter(Boolean))].join(", ");
     el("profile-headline").value = worker?.headline || "";
-    el("profile-phone").value = worker?.contact_phone || "";
-    el("profile-whatsapp").value = worker?.whatsapp_phone || "";
     el("profile-gender").value = worker?.gender || "";
     el("profile-skills").value = [...new Set((skills || []).map(x => x.skill).filter(Boolean))].join(", ");
     el("profile-publish").checked = !!worker?.is_published;
