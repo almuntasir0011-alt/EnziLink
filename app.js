@@ -370,7 +370,5 @@ el("worker-profile-form").addEventListener("submit", async event => {
   } catch (error) { profileSay(error.message || "প্রোফাইল সংরক্ষণ করা যায়নি।"); }
   finally { button.disabled = false; }
 });
-const dobMax = new Date(); dobMax.setHours(0,0,0,0); dobMax.setFullYear(dobMax.getFullYear()-18);
-el("profile-dob").max = [dobMax.getFullYear(), String(dobMax.getMonth()+1).padStart(2,"0"), String(dobMax.getDate()).padStart(2,"0")].join("-");
 el("year").textContent = new Date().getFullYear();
 window.addEventListener("load", async () => { try { await refreshSession(); } catch (_) {} await searchWorkers(); });
